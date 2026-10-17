@@ -97,7 +97,12 @@
 
             <hr>
             <a href="/admin/password_change/">🔐 Change Password</a>
-            <a href="/admin/logout/">↪ Logout</a>
+            <form method="post" action="{% url 'logout' %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                    Logout
+                </button>
+            </form>
         </aside>
 
         <main class="col-md-9 col-lg-10 erp-content">
