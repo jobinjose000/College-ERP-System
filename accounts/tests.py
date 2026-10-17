@@ -169,3 +169,113 @@ class DashboardAccessTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
+
+    
+class UserManagementIsolationTests(TestCase):
+    def setUp(self):
+        self.college_a = College.objects.create(
+            name="ABC Test College",
+            code="abc-test-college",
+        )
+        self.college_b = College.objects.create(
+            name="XYZ Test College",
+            code="xyz-test-college",
+        )
+
+        self.college_admin = User.objects.create_user(
+            username="college_admin_test",
+            password="TestPass123!",
+            role=User.Role.COLLEGE_ADMIN,
+            college=self.college_a,
+        )
+
+        self.student_a = User.objects.create_user(
+            username="student_a_test",
+            password="TestPass123!",
+            role=User.Role.STUDENT,
+            college=self.college_a,
+        )
+
+        self.student_b = User.objects.create_user(
+            username="student_b_test",
+            password="TestPass123!",
+            role=User.Role.STUDENT,
+            college=self.college_b,
+        )
+
+    def test_college_admin_sees_only_own_college_users(self):
+        self.client.force_login(self.college_admin)
+
+        response = self.client.get(reverse("user_list"))
+
+        self.assertEqual(response.status_code, 200)
+
+        usernames = {
+            user.username for user in response.context["users"]
+        }
+
+        self.assertIn("college_admin_test", usernames)
+        self.assertIn("student_a_test", usernames)
+        self.assertNotIn("student_b_test", usernames)
+
+    def test_college_admin_cannot_edit_other_college_user(self):
+        self.client.force_login(self.college_admin)
+
+        response = self.client.get(
+            reverse("user_edit", args=[self.student_b.pk]),
+            raise_request_exception=False,
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_college_admin_cannot_create_super_admin(self):
+        self.client.force_login(self.college_admin)
+
+        response = self.client.post(
+            reverse("user_create"),
+            {
+                "username": "unauthorized_super_admin",
+                "password": "TestPass123!",
+                "first_name": "Unauthorized",
+                "last_name": "Admin",
+                "email": "unauthorized@example.com",
+                "role": User.Role.SUPER_ADMIN,
+                "college": "",
+                "is_active": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            User.objects.filter(
+                username="unauthorized_super_admin"
+            ).exists()
+        )
+
+    def test_college_admin_cannot_move_user_to_another_college(self):
+        self.client.force_login(self.college_admin)
+
+        response = self.client.post(
+            reverse("user_create"),
+            {
+                "username": "new_student_test",
+                "password": "TestPass123!",
+                "first_name": "New",
+                "last_name": "Student",
+                "email": "newstudent@example.com",
+                "role": User.Role.STUDENT,
+                "college": str(self.college_b.pk),
+                "is_active": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        new_student = User.objects.get(
+            username="new_student_test"
+        )
+
+        self.assertEqual(
+            new_student.college_id,
+            self.college_a.pk,
+        )
