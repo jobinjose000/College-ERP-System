@@ -1,6 +1,8 @@
 
 from django.core.exceptions import PermissionDenied
 from django.test import TestCase, RequestFactory
+from django.urls import reverse
+from django.contrib.auth import get_user_model
 
 from accounts.models import User
 from accounts.permissions import (
@@ -110,3 +112,60 @@ class CollegePermissionTests(TestCase):
 
         with self.assertRaises(PermissionDenied):
             protected_view(request)
+
+class DashboardAccessTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+
+        self.super_admin = User.objects.create_user(
+            username="dashboard_admin",
+            password="TestPass123!",
+            role="SUPER_ADMIN",
+            is_staff=True,
+        )
+
+        self.student = User.objects.create_user(
+            username="dashboard_student",
+            password="TestPass123!",
+            role="STUDENT",
+        )
+
+        self.faculty = User.objects.create_user(
+            username="dashboard_faculty",
+            password="TestPass123!",
+            role="FACULTY",
+        )
+
+    def test_super_admin_can_access_super_admin_dashboard(self):
+        self.client.force_login(self.super_admin)
+
+        response = self.client.get(
+            reverse("super_admin_dashboard")
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_student_cannot_access_super_admin_dashboard(self):
+        self.client.force_login(self.student)
+
+        response = self.client.get(
+            reverse("super_admin_dashboard")
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_faculty_cannot_access_college_admin_dashboard(self):
+        self.client.force_login(self.faculty)
+
+        response = self.client.get(
+            reverse("college_admin_dashboard")
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_unauthenticated_user_is_redirected_to_login(self):
+        response = self.client.get(
+            reverse("super_admin_dashboard")
+        )
+
+        self.assertEqual(response.status_code, 302)
