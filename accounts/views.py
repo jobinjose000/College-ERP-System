@@ -8,6 +8,9 @@ from django.shortcuts import get_object_or_404
 from django.core.exceptions import PermissionDenied
 
 from .forms import UserManagementForm
+from .forms import StudentManagementForm
+from .models import StudentProfile
+from core.models import College
 
 @login_required
 def dashboard_redirect(request):
@@ -198,5 +201,86 @@ def user_edit(request, user_id):
             "form": form,
             "page_title": "Edit User",
             "managed_user": managed_user,
+        },
+    )
+
+
+@login_required
+@role_required(User.Role.SUPER_ADMIN, User.Role.COLLEGE_ADMIN)
+def student_list(request):
+    students = StudentProfile.objects.select_related(
+        "user",
+        "user__college",
+    ).order_by("registration_number")
+
+    if request.user.role == User.Role.COLLEGE_ADMIN:
+        students = students.filter(
+            user__college_id=request.user.college_id
+        )
+
+    return render(
+        request,
+        "accounts/student_list.html",
+        {"students": students},
+    )
+
+
+@login_required
+@role_required(User.Role.SUPER_ADMIN, User.Role.COLLEGE_ADMIN)
+def student_create(request):
+    if request.user.role == User.Role.COLLEGE_ADMIN:
+        if request.user.college_id is None:
+            raise PermissionDenied(
+                "Your account is not assigned to a college."
+            )
+
+    if request.method == "POST":
+        form = StudentManagementForm(request.POST)
+
+        if form.is_valid():
+            if request.user.role == User.Role.SUPER_ADMIN:
+                # A platform Super Admin must select a college
+                # through a trusted server-side choice.
+                college_id = request.POST.get("college_id")
+
+                if not college_id:
+                    form.add_error(
+                        None,
+                        "Please select a college for this student.",
+                    )
+                else:
+                    college = get_object_or_404(
+                        College,
+                        pk=college_id,
+                        is_active=True,
+                    )
+                    form.save(college=college)
+                    messages.success(
+                        request,
+                        "Student account created successfully.",
+                    )
+                    return redirect("student_list")
+
+            else:
+                # Never trust a College Admin's submitted college ID.
+                form.save(college=request.user.college)
+                messages.success(
+                    request,
+                    "Student account created successfully.",
+                )
+                return redirect("student_list")
+
+    else:
+        form = StudentManagementForm()
+
+    colleges = College.objects.filter(is_active=True).order_by("name")
+
+    return render(
+        request,
+        "accounts/student_form.html",
+        {
+            "form": form,
+            "colleges": colleges,
+            "page_title": "Add Student",
         },
     )
