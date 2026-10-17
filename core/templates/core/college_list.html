@@ -62,14 +62,37 @@
                                         {% endif %}
                                     </td>
 
+                                    
                                     <td class="text-end pe-3">
-                                        <a
-                                            href="{% url 'college_edit' college.id %}"
-                                            class="btn btn-sm btn-outline-primary"
-                                        >
-                                            Edit
-                                        </a>
+                                        <div class="d-inline-flex gap-2">
+                                            <a
+                                                href="{% url 'college_edit' college.id %}"
+                                                class="btn btn-sm btn-outline-primary"
+                                            >
+                                                Edit
+                                            </a>
+
+                                            <form
+                                                method="post"
+                                                action="{% url 'college_toggle_status' college.id %}"
+                                            >
+                                                {% csrf_token %}
+
+                                                {% if college.is_active %}
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                        Deactivate
+                                                    </button>
+                                                {% else %}
+                                                    <button type="submit" class="btn btn-sm btn-outline-success">
+                                                        Activate
+                                                    </button>
+                                                {% endif %}
+                                            </form>
+                                        </div>
                                     </td>
+
+
+                                    
                                 </tr>
                             {% endfor %}
                         </tbody>

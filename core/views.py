@@ -1,4 +1,4 @@
-
+from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -65,3 +65,16 @@ def college_edit(request, college_id):
             "college": college,
         },
     )
+
+
+
+
+@role_required(User.Role.SUPER_ADMIN)
+@require_POST
+def college_toggle_status(request, college_id):
+    college = get_object_or_404(College, pk=college_id)
+
+    college.is_active = not college.is_active
+    college.save(update_fields=["is_active"])
+
+    return redirect("college_list")
