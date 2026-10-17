@@ -1,0 +1,11 @@
+
+{% extends "accounts/base.html" %}
+{% block title %}Super Admin | College ERP{% endblock %}
+{% block content %}
+<h1 class="h3 fw-bold mb-2">Platform Overview</h1>
+<p class="text-secondary">Welcome, {{ request.user.username }}.</p>
+<div class="card erp-card p-4">
+    <h2 class="h5">Super Admin Dashboard</h2>
+    <p class="mb-0">Manage colleges and platform users.</p>
+</div>
+{% endblock %}

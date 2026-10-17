@@ -1,0 +1,111 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}College ERP{% endblock %}</title>
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+
+    <style>
+        body {
+            background: #f4f7fb;
+            min-height: 100vh;
+        }
+
+        .erp-navbar {
+            background: #14213d;
+        }
+
+        .erp-sidebar {
+            background: #ffffff;
+            min-height: calc(100vh - 56px);
+            border-right: 1px solid #e5e7eb;
+        }
+
+        .erp-sidebar a {
+            display: block;
+            color: #374151;
+            text-decoration: none;
+            padding: 12px 14px;
+            border-radius: 8px;
+            margin-bottom: 5px;
+        }
+
+        .erp-sidebar a:hover {
+            background: #eaf0ff;
+            color: #1d4ed8;
+        }
+
+        .erp-content {
+            padding: 28px;
+        }
+
+        .erp-card {
+            border: none;
+            border-radius: 14px;
+            box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark erp-navbar px-3">
+    <a class="navbar-brand fw-bold" href="{% url 'dashboard' %}">
+        🎓 College ERP
+    </a>
+
+    <div class="text-white">
+        {{ request.user.username }}
+        <span class="badge text-bg-info ms-2">
+            {{ request.user.get_role_display }}
+        </span>
+    </div>
+</nav>
+
+<div class="container-fluid">
+    <div class="row">
+        <aside class="col-md-3 col-lg-2 erp-sidebar p-3">
+            <h6 class="text-secondary mb-3">WORKSPACE</h6>
+
+            <a href="{% url 'dashboard' %}">🏠 Dashboard</a>
+
+            {% if request.user.role == "SUPER_ADMIN" %}
+                <a href="/admin/core/college/">🏫 Colleges</a>
+                <a href="/admin/accounts/user/">👥 Users</a>
+            {% endif %}
+
+            {% if request.user.role == "COLLEGE_ADMIN" %}
+                <a href="#">👥 Students</a>
+                <a href="#">👨‍🏫 Faculty</a>
+            {% endif %}
+
+            {% if request.user.role == "FACULTY" %}
+                <a href="#">📚 Classes</a>
+                <a href="#">📝 Attendance</a>
+                <a href="#">📊 Grades</a>
+            {% endif %}
+
+            {% if request.user.role == "STUDENT" %}
+                <a href="#">📅 My Attendance</a>
+                <a href="#">📊 My Grades</a>
+            {% endif %}
+
+            <hr>
+            <a href="/admin/password_change/">🔐 Change Password</a>
+            <a href="/admin/logout/">↪ Logout</a>
+        </aside>
+
+        <main class="col-md-9 col-lg-10 erp-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+
+{% extends "accounts/base.html" %}
+{% block title %}Faculty | College ERP{% endblock %}
+{% block content %}
+<h1 class="h3 fw-bold mb-2">Faculty Workspace</h1>
+<p class="text-secondary">Welcome, {{ request.user.username }}.</p>
+<div class="card erp-card p-4">
+    <h2 class="h5">Academic Management</h2>
+    <p class="mb-0">Your workspace for classes, attendance, and grading.</p>
+</div>
+{% endblock %}
