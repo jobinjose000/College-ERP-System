@@ -6,6 +6,7 @@ from .models import (
     ClassSection,
     Course,
     Department,
+    Enrollment,
     FacultyAssignment,
 )
 
@@ -70,4 +71,24 @@ class FacultyAssignmentAdmin(admin.ModelAdmin):
         "faculty__username",
         "course__code",
         "course__name",
+    )
+
+
+@admin.register(Enrollment)
+class EnrollmentAdmin(admin.ModelAdmin):
+    list_display = (
+        "student",
+        "academic_year",
+        "class_section",
+        "enrolled_at",
+        "is_active",
+    )
+    list_filter = (
+        "academic_year",
+        "class_section",
+        "is_active",
+    )
+    search_fields = (
+        "student__registration_number",
+        "student__user__username",
     )

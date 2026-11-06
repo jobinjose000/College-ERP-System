@@ -1,0 +1,73 @@
+{% extends "accounts/base.html" %}
+
+{% block title %}Enroll Student | College ERP{% endblock %}
+
+{% block content %}
+
+<div class="mb-4">
+    <h1 class="h3 fw-bold mb-1">Enroll Student</h1>
+
+    <p class="text-secondary">
+        Assign a student to an academic year and class section.
+    </p>
+</div>
+
+
+<div class="card erp-card p-4">
+
+    <form method="post">
+
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        {% for field in form %}
+
+            <div class="mb-3">
+
+                <label for="{{ field.id_for_label }}"
+                       class="form-label fw-semibold">
+                    {{ field.label }}
+                </label>
+
+                {{ field }}
+
+                {% if field.help_text %}
+                    <div class="form-text">
+                        {{ field.help_text }}
+                    </div>
+                {% endif %}
+
+                {% for error in field.errors %}
+                    <div class="text-danger small">
+                        {{ error }}
+                    </div>
+                {% endfor %}
+
+            </div>
+
+        {% endfor %}
+
+
+        <div class="d-flex gap-2 mt-4">
+
+            <button type="submit" class="btn btn-primary">
+                Save Enrollment
+            </button>
+
+            <a href="{% url 'enrollment_list' %}"
+               class="btn btn-outline-secondary">
+                Cancel
+            </a>
+
+        </div>
+
+    </form>
+
+</div>
+
+{% endblock %}

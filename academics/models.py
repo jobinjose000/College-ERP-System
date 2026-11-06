@@ -3,6 +3,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from accounts.models import StudentProfile
 
 class Department(models.Model):
     college = models.ForeignKey(
@@ -224,4 +225,71 @@ class FacultyAssignment(models.Model):
             f"{self.faculty.username} - "
             f"{self.course.code} - "
             f"{self.class_section.name}"
+        )
+
+class Enrollment(models.Model):
+    student = models.ForeignKey(
+        StudentProfile,
+        on_delete=models.PROTECT,
+        related_name="enrollments",
+    )
+    academic_year = models.ForeignKey(
+        AcademicYear,
+        on_delete=models.PROTECT,
+        related_name="enrollments",
+    )
+    class_section = models.ForeignKey(
+        ClassSection,
+        on_delete=models.PROTECT,
+        related_name="enrollments",
+    )
+    enrolled_at = models.DateField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "academic_year"],
+                name="unique_student_enrollment_per_year",
+            ),
+        ]
+        ordering = ["student__registration_number"]
+
+    def clean(self):
+        if not self.student_id or not self.class_section_id:
+            return
+
+        if self.student.user.role != "STUDENT":
+            raise ValidationError(
+                "Only student accounts can be enrolled."
+            )
+
+        if (
+            self.student.user.college_id
+            != self.class_section.college_id
+        ):
+            raise ValidationError(
+                "Student and class must belong to the same college."
+            )
+
+        if (
+            self.academic_year_id
+            != self.class_section.academic_year_id
+        ):
+            raise ValidationError(
+                "Academic year must match the class section."
+            )
+
+        if (
+            self.student.department
+            != self.class_section.department.name
+        ):
+            raise ValidationError(
+                "Student and class must belong to the same department."
+            )
+
+    def __str__(self):
+        return (
+            f"{self.student.registration_number} - "
+            f"{self.class_section}"
         )

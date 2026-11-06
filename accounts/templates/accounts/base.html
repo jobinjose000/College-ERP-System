@@ -1,4 +1,4 @@
-```html
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -82,7 +82,6 @@
 
 <body>
 
-<!-- Top navigation -->
 <nav class="navbar navbar-dark erp-navbar px-3">
     <a class="navbar-brand fw-bold" href="{% url 'dashboard' %}">
         🎓 College ERP
@@ -97,23 +96,19 @@
     </div>
 </nav>
 
-<!-- Main layout -->
 <div class="container-fluid">
     <div class="row">
 
-        <!-- Sidebar -->
         <aside class="col-md-3 col-lg-2 erp-sidebar p-3">
 
             <h6 class="text-secondary sidebar-heading mb-3">
                 WORKSPACE
             </h6>
 
-            <!-- All authenticated roles -->
             <a href="{% url 'dashboard' %}">
                 🏠 Dashboard
             </a>
 
-            <!-- Super Admin navigation -->
             {% if request.user.role == "SUPER_ADMIN" %}
 
                 <hr>
@@ -133,13 +128,17 @@
                 <a href="{% url 'student_list' %}">
                     🎓 Students
                 </a>
-                <a href="{% url 'faculty_list' %}" class="nav-link">
+
+                <a href="{% url 'faculty_list' %}">
                     👨‍🏫 Faculty
+                </a>
+
+                <a href="{% url 'enrollment_list' %}">
+                    📋 Student Enrollments
                 </a>
 
             {% endif %}
 
-            <!-- College Admin navigation -->
             {% if request.user.role == "COLLEGE_ADMIN" %}
 
                 <hr>
@@ -152,15 +151,20 @@
                     👥 Users
                 </a>
 
-                <a href="{% url 'student_list' %}">🎓 Students</a>
+                <a href="{% url 'student_list' %}">
+                    🎓 Students
+                </a>
 
-                <a href="{% url 'faculty_list' %}" class="nav-link">
+                <a href="{% url 'faculty_list' %}">
                     👨‍🏫 Faculty
+                </a>
+
+                <a href="{% url 'enrollment_list' %}">
+                    📋 Student Enrollments
                 </a>
 
             {% endif %}
 
-            <!-- Faculty navigation -->
             {% if request.user.role == "FACULTY" %}
 
                 <hr>
@@ -183,7 +187,6 @@
 
             {% endif %}
 
-            <!-- Student navigation -->
             {% if request.user.role == "STUDENT" %}
 
                 <hr>
@@ -202,7 +205,6 @@
 
             {% endif %}
 
-            <!-- Account actions -->
             <hr>
 
             <h6 class="text-secondary sidebar-heading mb-2">
@@ -226,7 +228,6 @@
 
         </aside>
 
-        <!-- Page content -->
         <main class="col-md-9 col-lg-10 erp-content">
 
             {% if messages %}
@@ -258,4 +259,3 @@
 
 </body>
 </html>
-```
