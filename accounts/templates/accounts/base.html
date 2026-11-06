@@ -130,7 +130,12 @@
                     👥 Users
                 </a>
 
-                <a href="{% url 'student_list' %}">🎓 Students</a>
+                <a href="{% url 'student_list' %}">
+                    🎓 Students
+                </a>
+                <a href="{% url 'faculty_list' %}" class="nav-link">
+                    👨‍🏫 Faculty
+                </a>
 
             {% endif %}
 
@@ -149,7 +154,7 @@
 
                 <a href="{% url 'student_list' %}">🎓 Students</a>
 
-                <a href="#">
+                <a href="{% url 'faculty_list' %}" class="nav-link">
                     👨‍🏫 Faculty
                 </a>
 

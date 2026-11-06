@@ -1,26 +1,36 @@
 
-from django.contrib.auth.decorators import login_required
-from .permissions import role_required
-from django.shortcuts import redirect, render
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.shortcuts import get_object_or_404
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import UserManagementForm
-from .forms import StudentManagementForm
-from .models import StudentProfile
 from core.models import College
+from .forms import (
+    UserManagementForm,
+    StudentManagementForm,
+    FacultyManagementForm,
+)
+from .models import StudentProfile, FacultyProfile
+from .permissions import role_required
+
+
+User = get_user_model()
+
+
+# --------------------------------------------------
+# Dashboard Views
+# --------------------------------------------------
 
 @login_required
 def dashboard_redirect(request):
     """Send each user to the dashboard for their ERP role."""
 
     role_dashboards = {
-        "SUPER_ADMIN": "super_admin_dashboard",
-        "COLLEGE_ADMIN": "college_admin_dashboard",
-        "FACULTY": "faculty_dashboard",
-        "STUDENT": "student_dashboard",
+        User.Role.SUPER_ADMIN: "super_admin_dashboard",
+        User.Role.COLLEGE_ADMIN: "college_admin_dashboard",
+        User.Role.FACULTY: "faculty_dashboard",
+        User.Role.STUDENT: "student_dashboard",
     }
 
     dashboard_url = role_dashboards.get(request.user.role)
@@ -28,59 +38,104 @@ def dashboard_redirect(request):
     if dashboard_url:
         return redirect(dashboard_url)
 
-    return render(request, "accounts/role_error.html", status=403)
+    return render(
+        request,
+        "accounts/role_error.html",
+        status=403,
+    )
 
 
 @login_required
+@role_required(User.Role.SUPER_ADMIN)
 def super_admin_dashboard(request):
-    if request.user.role != "SUPER_ADMIN":
-        return render(request, "accounts/role_error.html", status=403)
-
-    return render(request, "accounts/super_admin_dashboard.html")
+    return render(
+        request,
+        "accounts/super_admin_dashboard.html",
+    )
 
 
 @login_required
+@role_required(User.Role.COLLEGE_ADMIN)
 def college_admin_dashboard(request):
-    if request.user.role != "COLLEGE_ADMIN":
-        return render(request, "accounts/role_error.html", status=403)
-
-    return render(request, "accounts/college_admin_dashboard.html")
+    return render(
+        request,
+        "accounts/college_admin_dashboard.html",
+    )
 
 
 @login_required
+@role_required(User.Role.FACULTY)
 def faculty_dashboard(request):
-    if request.user.role != "FACULTY":
-        return render(request, "accounts/role_error.html", status=403)
-
-    return render(request, "accounts/faculty_dashboard.html")
+    return render(
+        request,
+        "accounts/faculty_dashboard.html",
+    )
 
 
 @login_required
+@role_required(User.Role.STUDENT)
 def student_dashboard(request):
-    if request.user.role != "STUDENT":
-        return render(request, "accounts/role_error.html", status=403)
-
-    return render(request, "accounts/student_dashboard.html")
-
-
-
-User = get_user_model()
+    return render(
+        request,
+        "accounts/student_dashboard.html",
+    )
 
 
-@login_required
+# --------------------------------------------------
+# Shared Helper
+# --------------------------------------------------
+
+def get_active_college_from_post(request, form, error_message):
+    """
+    Validate the submitted college ID for a Super Admin.
+
+    Return an active college or None if the submitted ID is
+    missing or invalid. Invalid selections become form errors.
+    """
+    college_id = request.POST.get("college_id")
+
+    if not college_id:
+        form.add_error(None, error_message)
+        return None
+
+    try:
+        college = College.objects.filter(
+            is_active=True,
+        ).get(pk=college_id)
+    except (College.DoesNotExist, ValueError, TypeError):
+        form.add_error(
+            None,
+            "Select a valid active college.",
+        )
+        return None
+
+    return college
+
+
+# --------------------------------------------------
+# User Management
+# --------------------------------------------------
+
 @role_required(User.Role.SUPER_ADMIN, User.Role.COLLEGE_ADMIN)
 def user_list(request):
     if request.user.role == User.Role.SUPER_ADMIN:
-        users = User.objects.select_related("college").order_by("username")
+        users = User.objects.select_related(
+            "college",
+        ).order_by("username")
     else:
         users = User.objects.filter(
-            college_id=request.user.college_id
-        ).select_related("college").order_by("username")
+            college_id=request.user.college_id,
+        ).select_related(
+            "college",
+        ).order_by("username")
 
-    return render(request, "accounts/user_list.html", {"users": users})
+    return render(
+        request,
+        "accounts/user_list.html",
+        {"users": users},
+    )
 
 
-@login_required
 @role_required(User.Role.SUPER_ADMIN, User.Role.COLLEGE_ADMIN)
 def user_create(request):
     if request.method == "POST":
@@ -90,7 +145,10 @@ def user_create(request):
             new_user = form.save(commit=False)
 
             if request.user.role == User.Role.COLLEGE_ADMIN:
-                new_user.college = request.user.college
+                if request.user.college_id is None:
+                    raise PermissionDenied(
+                        "Your account is not assigned to a college."
+                    )
 
                 if new_user.role == User.Role.SUPER_ADMIN:
                     form.add_error(
@@ -98,22 +156,26 @@ def user_create(request):
                         "College Admins cannot create Super Admin accounts.",
                     )
                 else:
+                    # Always assign the logged-in admin's college.
+                    new_user.college = request.user.college
                     new_user.save()
                     form.save_m2m()
+
                     messages.success(
                         request,
                         "User account created successfully.",
                     )
                     return redirect("user_list")
+
             else:
                 new_user.save()
                 form.save_m2m()
+
                 messages.success(
                     request,
                     "User account created successfully.",
                 )
                 return redirect("user_list")
-
     else:
         form = UserManagementForm()
 
@@ -123,17 +185,20 @@ def user_create(request):
     return render(
         request,
         "accounts/user_form.html",
-        {"form": form, "page_title": "Create User"},
+        {
+            "form": form,
+            "page_title": "Create User",
+        },
     )
 
 
-
-@login_required
 @role_required(User.Role.SUPER_ADMIN, User.Role.COLLEGE_ADMIN)
 def user_edit(request, user_id):
-    managed_user = get_object_or_404(User, pk=user_id)
+    managed_user = get_object_or_404(
+        User,
+        pk=user_id,
+    )
 
-    # College Admins can only edit users in their own college.
     if request.user.role == User.Role.COLLEGE_ADMIN:
         if (
             request.user.college_id is None
@@ -143,7 +208,6 @@ def user_edit(request, user_id):
                 "You cannot edit users from another college."
             )
 
-        # College Admins cannot edit Super Admin accounts.
         if managed_user.role == User.Role.SUPER_ADMIN:
             raise PermissionDenied(
                 "You cannot edit a Super Admin account."
@@ -159,32 +223,36 @@ def user_edit(request, user_id):
             updated_user = form.save(commit=False)
 
             if request.user.role == User.Role.COLLEGE_ADMIN:
-                updated_user.college = request.user.college
-
                 if updated_user.role == User.Role.SUPER_ADMIN:
                     form.add_error(
                         "role",
                         "College Admins cannot assign the Super Admin role.",
                     )
                 else:
+                    # Prevent reassignment to another college.
+                    updated_user.college = request.user.college
                     updated_user.save()
                     form.save_m2m()
+
                     messages.success(
                         request,
                         "User account updated successfully.",
                     )
                     return redirect("user_list")
+
             else:
                 updated_user.save()
                 form.save_m2m()
+
                 messages.success(
                     request,
                     "User account updated successfully.",
                 )
                 return redirect("user_list")
-
     else:
-        form = UserManagementForm(instance=managed_user)
+        form = UserManagementForm(
+            instance=managed_user,
+        )
 
     if request.user.role == User.Role.COLLEGE_ADMIN:
         form.fields["college"].disabled = True
@@ -205,7 +273,10 @@ def user_edit(request, user_id):
     )
 
 
-@login_required
+# --------------------------------------------------
+# Student Management
+# --------------------------------------------------
+
 @role_required(User.Role.SUPER_ADMIN, User.Role.COLLEGE_ADMIN)
 def student_list(request):
     students = StudentProfile.objects.select_related(
@@ -215,7 +286,7 @@ def student_list(request):
 
     if request.user.role == User.Role.COLLEGE_ADMIN:
         students = students.filter(
-            user__college_id=request.user.college_id
+            user__college_id=request.user.college_id,
         )
 
     return render(
@@ -225,36 +296,30 @@ def student_list(request):
     )
 
 
-@login_required
 @role_required(User.Role.SUPER_ADMIN, User.Role.COLLEGE_ADMIN)
 def student_create(request):
-    if request.user.role == User.Role.COLLEGE_ADMIN:
-        if request.user.college_id is None:
-            raise PermissionDenied(
-                "Your account is not assigned to a college."
-            )
+    if (
+        request.user.role == User.Role.COLLEGE_ADMIN
+        and request.user.college_id is None
+    ):
+        raise PermissionDenied(
+            "Your account is not assigned to a college."
+        )
 
     if request.method == "POST":
         form = StudentManagementForm(request.POST)
 
         if form.is_valid():
             if request.user.role == User.Role.SUPER_ADMIN:
-                # A platform Super Admin must select a college
-                # through a trusted server-side choice.
-                college_id = request.POST.get("college_id")
+                college = get_active_college_from_post(
+                    request,
+                    form,
+                    "Please select a college for this student.",
+                )
 
-                if not college_id:
-                    form.add_error(
-                        None,
-                        "Please select a college for this student.",
-                    )
-                else:
-                    college = get_object_or_404(
-                        College,
-                        pk=college_id,
-                        is_active=True,
-                    )
+                if college is not None:
                     form.save(college=college)
+
                     messages.success(
                         request,
                         "Student account created successfully.",
@@ -262,18 +327,20 @@ def student_create(request):
                     return redirect("student_list")
 
             else:
-                # Never trust a College Admin's submitted college ID.
+                # Never trust a submitted college ID from a College Admin.
                 form.save(college=request.user.college)
+
                 messages.success(
                     request,
                     "Student account created successfully.",
                 )
                 return redirect("student_list")
-
     else:
         form = StudentManagementForm()
 
-    colleges = College.objects.filter(is_active=True).order_by("name")
+    colleges = College.objects.filter(
+        is_active=True,
+    ).order_by("name")
 
     return render(
         request,
@@ -282,5 +349,85 @@ def student_create(request):
             "form": form,
             "colleges": colleges,
             "page_title": "Add Student",
+        },
+    )
+
+
+# --------------------------------------------------
+# Faculty Management
+# --------------------------------------------------
+
+@role_required(User.Role.SUPER_ADMIN, User.Role.COLLEGE_ADMIN)
+def faculty_list(request):
+    faculty_members = FacultyProfile.objects.select_related(
+        "user",
+        "user__college",
+    ).order_by("employee_id")
+
+    if request.user.role == User.Role.COLLEGE_ADMIN:
+        faculty_members = faculty_members.filter(
+            user__college_id=request.user.college_id,
+        )
+
+    return render(
+        request,
+        "accounts/faculty_list.html",
+        {"faculty_members": faculty_members},
+    )
+
+
+@role_required(User.Role.SUPER_ADMIN, User.Role.COLLEGE_ADMIN)
+def faculty_create(request):
+    if (
+        request.user.role == User.Role.COLLEGE_ADMIN
+        and request.user.college_id is None
+    ):
+        raise PermissionDenied(
+            "Your account is not assigned to a college."
+        )
+
+    if request.method == "POST":
+        form = FacultyManagementForm(request.POST)
+
+        if form.is_valid():
+            if request.user.role == User.Role.SUPER_ADMIN:
+                college = get_active_college_from_post(
+                    request,
+                    form,
+                    "Please select a college for this faculty member.",
+                )
+
+                if college is not None:
+                    form.save(college=college)
+
+                    messages.success(
+                        request,
+                        "Faculty account created successfully.",
+                    )
+                    return redirect("faculty_list")
+
+            else:
+                # College Admins can only create faculty in their college.
+                form.save(college=request.user.college)
+
+                messages.success(
+                    request,
+                    "Faculty account created successfully.",
+                )
+                return redirect("faculty_list")
+    else:
+        form = FacultyManagementForm()
+
+    colleges = College.objects.filter(
+        is_active=True,
+    ).order_by("name")
+
+    return render(
+        request,
+        "accounts/faculty_form.html",
+        {
+            "form": form,
+            "colleges": colleges,
+            "page_title": "Add Faculty",
         },
     )

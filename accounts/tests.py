@@ -3,7 +3,7 @@ from django.core.exceptions import PermissionDenied
 from django.test import TestCase, RequestFactory
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from accounts.models import StudentProfile
+from accounts.models import StudentProfile, FacultyProfile
 from accounts.models import User
 from accounts.permissions import (
     is_same_college_or_super_admin,
@@ -406,6 +406,174 @@ class StudentManagementTests(TestCase):
         create_response = self.client.get(
             reverse("student_create")
         )
+
+        self.assertEqual(list_response.status_code, 403)
+        self.assertEqual(create_response.status_code, 403)
+
+
+class FacultyManagementTests(TestCase):
+    def setUp(self):
+        self.college_a = College.objects.create(
+            name="Faculty Test College A",
+            code="faculty-test-a",
+        )
+
+        self.college_b = College.objects.create(
+            name="Faculty Test College B",
+            code="faculty-test-b",
+        )
+
+        self.super_admin = User.objects.create_user(
+            username="faculty_platform_admin",
+            password="TestPass123!",
+            role=User.Role.SUPER_ADMIN,
+        )
+
+        self.college_admin = User.objects.create_user(
+            username="faculty_college_admin",
+            password="TestPass123!",
+            role=User.Role.COLLEGE_ADMIN,
+            college=self.college_a,
+        )
+
+        self.student = User.objects.create_user(
+            username="faculty_test_student",
+            password="TestPass123!",
+            role=User.Role.STUDENT,
+            college=self.college_a,
+        )
+
+        self.faculty_a = User.objects.create_user(
+            username="faculty_a",
+            password="TestPass123!",
+            role=User.Role.FACULTY,
+            college=self.college_a,
+        )
+
+        FacultyProfile.objects.create(
+            user=self.faculty_a,
+            employee_id="FAC-TEST-001",
+            department="Computer Science",
+            designation="Assistant Professor",
+            qualification="M.Tech",
+        )
+
+        self.faculty_b = User.objects.create_user(
+            username="faculty_b",
+            password="TestPass123!",
+            role=User.Role.FACULTY,
+            college=self.college_b,
+        )
+
+        FacultyProfile.objects.create(
+            user=self.faculty_b,
+            employee_id="FAC-TEST-002",
+            department="Electronics",
+            designation="Professor",
+            qualification="Ph.D.",
+        )
+
+    def test_super_admin_can_view_faculty_from_all_colleges(self):
+        self.client.force_login(self.super_admin)
+
+        response = self.client.get(reverse("faculty_list"))
+
+        self.assertEqual(response.status_code, 200)
+
+        employee_ids = {
+            faculty.employee_id
+            for faculty in response.context["faculty_members"]
+        }
+
+        self.assertIn("FAC-TEST-001", employee_ids)
+        self.assertIn("FAC-TEST-002", employee_ids)
+
+    def test_college_admin_sees_only_own_college_faculty(self):
+        self.client.force_login(self.college_admin)
+
+        response = self.client.get(reverse("faculty_list"))
+
+        self.assertEqual(response.status_code, 200)
+
+        employee_ids = {
+            faculty.employee_id
+            for faculty in response.context["faculty_members"]
+        }
+
+        self.assertIn("FAC-TEST-001", employee_ids)
+        self.assertNotIn("FAC-TEST-002", employee_ids)
+
+    def test_super_admin_can_create_faculty(self):
+        self.client.force_login(self.super_admin)
+
+        response = self.client.post(
+            reverse("faculty_create"),
+            {
+                "username": "new_faculty_admin_test",
+                "email": "newfaculty@example.com",
+                "first_name": "New",
+                "last_name": "Faculty",
+                "password": "TestPass123!",
+                "employee_id": "FAC-TEST-003",
+                "department": "Computer Science",
+                "designation": "Assistant Professor",
+                "qualification": "M.Tech",
+                "phone_number": "9876543210",
+                "college_id": str(self.college_a.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        new_faculty = User.objects.get(
+            username="new_faculty_admin_test"
+        )
+
+        self.assertEqual(new_faculty.role, User.Role.FACULTY)
+        self.assertEqual(new_faculty.college_id, self.college_a.pk)
+
+        self.assertTrue(
+            FacultyProfile.objects.filter(
+                user=new_faculty,
+                employee_id="FAC-TEST-003",
+            ).exists()
+        )
+
+    def test_college_admin_can_create_faculty_in_own_college(self):
+        self.client.force_login(self.college_admin)
+
+        response = self.client.post(
+            reverse("faculty_create"),
+            {
+                "username": "new_faculty_college_test",
+                "email": "collegefaculty@example.com",
+                "first_name": "College",
+                "last_name": "Faculty",
+                "password": "TestPass123!",
+                "employee_id": "FAC-TEST-004",
+                "department": "Mathematics",
+                "designation": "Lecturer",
+                "qualification": "M.Sc.",
+                "phone_number": "9876543211",
+                "college_id": str(self.college_b.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        new_faculty = User.objects.get(
+            username="new_faculty_college_test"
+        )
+
+        # College Admin must only create faculty in their own college.
+        self.assertEqual(new_faculty.role, User.Role.FACULTY)
+        self.assertEqual(new_faculty.college_id, self.college_a.pk)
+
+    def test_student_cannot_access_faculty_management(self):
+        self.client.force_login(self.student)
+
+        list_response = self.client.get(reverse("faculty_list"))
+        create_response = self.client.get(reverse("faculty_create"))
 
         self.assertEqual(list_response.status_code, 403)
         self.assertEqual(create_response.status_code, 403)
