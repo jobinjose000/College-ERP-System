@@ -14,6 +14,8 @@ from .forms import (
 from .models import StudentProfile, FacultyProfile
 from .permissions import role_required
 
+from academics.models import FacultyAssignment
+
 
 User = get_user_model()
 
@@ -66,9 +68,27 @@ def college_admin_dashboard(request):
 @login_required
 @role_required(User.Role.FACULTY)
 def faculty_dashboard(request):
+    assignments = (
+        FacultyAssignment.objects
+        .filter(
+            faculty=request.user,
+            college=request.user.college,
+        )
+        .select_related(
+            "course",
+            "course__department",
+            "class_section",
+            "class_section__academic_year",
+        )
+        .order_by("course__code")
+    )
+
     return render(
         request,
         "accounts/faculty_dashboard.html",
+        {
+            "assignments": assignments,
+        },
     )
 
 

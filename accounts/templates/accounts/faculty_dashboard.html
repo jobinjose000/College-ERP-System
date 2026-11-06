@@ -1,11 +1,83 @@
 
 {% extends "accounts/base.html" %}
-{% block title %}Faculty | College ERP{% endblock %}
+
+{% block title %}Faculty Dashboard | College ERP{% endblock %}
+
 {% block content %}
+
 <h1 class="h3 fw-bold mb-2">Faculty Workspace</h1>
-<p class="text-secondary">Welcome, {{ request.user.username }}.</p>
-<div class="card erp-card p-4">
-    <h2 class="h5">Academic Management</h2>
-    <p class="mb-0">Your workspace for classes, attendance, and grading.</p>
+
+<p class="text-secondary">
+    Welcome, {{ request.user.username }}.
+</p>
+
+<div class="card erp-card p-4 mb-4">
+    <h2 class="h5 fw-bold mb-2">Academic Management</h2>
+    <p class="text-secondary mb-0">
+        Manage your assigned subjects and classes.
+    </p>
 </div>
+
+<h2 class="h5 fw-bold mb-3">My Assigned Subjects</h2>
+
+{% if assignments %}
+
+<div class="row g-3">
+
+    {% for assignment in assignments %}
+
+    <div class="col-md-6 col-xl-4">
+        <div class="card erp-card h-100 p-3">
+
+            <div class="d-flex justify-content-between mb-2">
+                <span class="badge bg-primary">
+                    {{ assignment.course.code }}
+                </span>
+
+                <span class="badge bg-secondary">
+                    Semester {{ assignment.class_section.semester }}
+                </span>
+            </div>
+
+            <h3 class="h5 fw-bold">
+                {{ assignment.course.name }}
+            </h3>
+
+            <p class="text-secondary mb-2">
+                {{ assignment.course.department.name }}
+            </p>
+
+            <hr>
+
+            <p class="mb-1">
+                <strong>Class:</strong>
+                {{ assignment.class_section.name }}
+            </p>
+
+            <p class="mb-1">
+                <strong>Academic Year:</strong>
+                {{ assignment.class_section.academic_year.name }}
+            </p>
+
+            <p class="mb-0">
+                <strong>Credits:</strong>
+                {{ assignment.course.credits }}
+            </p>
+
+        </div>
+    </div>
+
+    {% endfor %}
+
+</div>
+
+{% else %}
+
+<div class="alert alert-info">
+    You currently have no assigned subjects.
+    Please contact your College Administrator.
+</div>
+
+{% endif %}
+
 {% endblock %}
