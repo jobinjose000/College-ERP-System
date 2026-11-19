@@ -14,4 +14,9 @@ urlpatterns = [
         views.enrollment_create,
         name="enrollment_create",
     ),
+    path(
+        "faculty/assignments/<int:assignment_id>/students/",
+        views.assigned_class_students,
+        name="assigned_class_students",
+    ),
 ]

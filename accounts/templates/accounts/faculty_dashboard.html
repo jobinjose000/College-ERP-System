@@ -1,4 +1,4 @@
-
+```django
 {% extends "accounts/base.html" %}
 
 {% block title %}Faculty Dashboard | College ERP{% endblock %}
@@ -64,6 +64,12 @@
                 {{ assignment.course.credits }}
             </p>
 
+            <a href="{% url 'assigned_class_students' assignment.id %}"
+               class="btn btn-outline-primary w-100 mt-3">
+                <i class="bi bi-people"></i>
+                View Students
+            </a>
+
         </div>
     </div>
 
@@ -81,3 +87,4 @@
 {% endif %}
 
 {% endblock %}
+```
