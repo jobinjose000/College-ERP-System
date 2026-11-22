@@ -148,3 +148,62 @@ class TimetableForm(forms.ModelForm):
             timetable.save()
 
         return timetable
+
+
+
+class AcademicYearForm(forms.ModelForm):
+
+    class Meta:
+        model = AcademicYear
+        fields = [
+            "name",
+            "start_date",
+            "end_date",
+            "is_active",
+        ]
+
+        widgets = {
+            "name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Example: 2027-2028",
+                }
+            ),
+            "start_date": forms.DateInput(
+                attrs={
+                    "type": "date",
+                    "class": "form-control",
+                }
+            ),
+            "end_date": forms.DateInput(
+                attrs={
+                    "type": "date",
+                    "class": "form-control",
+                }
+            ),
+            "is_active": forms.CheckboxInput(
+                attrs={
+                    "class": "form-check-input",
+                }
+            ),
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if user is None or user.college is None:
+            raise ValueError(
+                "A College Admin account is required."
+            )
+
+        self.user = user
+
+    def save(self, commit=True):
+        academic_year = super().save(commit=False)
+        academic_year.college = self.user.college
+
+        if commit:
+            academic_year.full_clean()
+            academic_year.save()
+
+        return academic_year

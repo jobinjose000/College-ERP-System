@@ -8,7 +8,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from accounts.models import User
 from accounts.permissions import role_required
 
-from .forms import EnrollmentForm, TimetableForm
+from .forms import (
+    EnrollmentForm,
+    TimetableForm,
+    AcademicYearForm,
+)
 from .models import (
     Enrollment,
     FacultyAssignment,
@@ -350,4 +354,135 @@ def timetable_create(request):
         request,
         "academics/timetable_form.html",
         {"form": form},
+    )
+
+
+
+# --------------------------------------------------
+# ACADEMIC YEAR MANAGEMENT
+# --------------------------------------------------
+
+@login_required
+@role_required(User.Role.COLLEGE_ADMIN)
+def academic_year_list(request):
+
+    academic_years = AcademicYear.objects.filter(
+        college=request.user.college
+    ).order_by("-start_date")
+
+    return render(
+        request,
+        "academics/academic_year_list.html",
+        {
+            "academic_years": academic_years,
+        },
+    )
+
+
+@login_required
+@role_required(User.Role.COLLEGE_ADMIN)
+def academic_year_create(request):
+
+    if request.method == "POST":
+        form = AcademicYearForm(
+            request.POST,
+            user=request.user,
+        )
+
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+
+                    academic_year = form.save(commit=False)
+                    academic_year.college = request.user.college
+
+                    if academic_year.is_active:
+                        AcademicYear.objects.filter(
+                            college=request.user.college,
+                            is_active=True,
+                        ).update(is_active=False)
+
+                    academic_year.full_clean()
+                    academic_year.save()
+
+                messages.success(
+                    request,
+                    "Academic year created successfully.",
+                )
+
+                return redirect("academic_year_list")
+
+            except ValidationError as error:
+                form.add_error(None, error)
+
+    else:
+        form = AcademicYearForm(user=request.user)
+
+    return render(
+        request,
+        "academics/academic_year_form.html",
+        {
+            "form": form,
+            "title": "Create Academic Year",
+        },
+    )
+
+
+@login_required
+@role_required(User.Role.COLLEGE_ADMIN)
+def academic_year_edit(request, year_id):
+
+    academic_year = get_object_or_404(
+        AcademicYear,
+        id=year_id,
+        college=request.user.college,
+    )
+
+    if request.method == "POST":
+        form = AcademicYearForm(
+            request.POST,
+            instance=academic_year,
+            user=request.user,
+        )
+
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+
+                    updated_year = form.save(commit=False)
+
+                    if updated_year.is_active:
+                        AcademicYear.objects.filter(
+                            college=request.user.college,
+                            is_active=True,
+                        ).exclude(
+                            id=updated_year.id
+                        ).update(is_active=False)
+
+                    updated_year.full_clean()
+                    updated_year.save()
+
+                messages.success(
+                    request,
+                    "Academic year updated successfully.",
+                )
+
+                return redirect("academic_year_list")
+
+            except ValidationError as error:
+                form.add_error(None, error)
+
+    else:
+        form = AcademicYearForm(
+            instance=academic_year,
+            user=request.user,
+        )
+
+    return render(
+        request,
+        "academics/academic_year_form.html",
+        {
+            "form": form,
+            "title": "Edit Academic Year",
+        },
     )

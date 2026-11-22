@@ -376,3 +376,180 @@ class FacultyAssignedStudentsTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "FOREIGN001")
+
+
+
+class AcademicYearManagementTests(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+
+        cls.college = College.objects.create(
+            name="ABC College of Engineering",
+            code="academic-test-abc",
+            email="abc-academic@example.com",
+            address="Kollam",
+        )
+
+        cls.other_college = College.objects.create(
+            name="Green Valley College",
+            code="academic-test-green",
+            email="green-academic@example.com",
+            address="Kochi",
+        )
+
+        cls.college_admin = User.objects.create_user(
+            username="academic_admin",
+            password="testpassword123",
+            role=User.Role.COLLEGE_ADMIN,
+            college=cls.college,
+        )
+
+        cls.other_college_admin = User.objects.create_user(
+            username="green_academic_admin",
+            password="testpassword123",
+            role=User.Role.COLLEGE_ADMIN,
+            college=cls.other_college,
+        )
+
+        cls.academic_year = AcademicYear.objects.create(
+            college=cls.college,
+            name="2026-2027",
+            start_date=date(2026, 6, 1),
+            end_date=date(2027, 5, 31),
+            is_active=True,
+        )
+
+        cls.other_academic_year = AcademicYear.objects.create(
+            college=cls.other_college,
+            name="2026-2027",
+            start_date=date(2026, 6, 1),
+            end_date=date(2027, 5, 31),
+            is_active=True,
+        )
+
+    def test_college_admin_can_create_academic_year(self):
+
+        self.client.force_login(self.college_admin)
+
+        response = self.client.post(
+            reverse("academic_year_create"),
+            {
+                "name": "2027-2028",
+                "start_date": "2027-06-01",
+                "end_date": "2028-05-31",
+                "is_active": True,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        new_year = AcademicYear.objects.get(
+            college=self.college,
+            name="2027-2028",
+        )
+
+        self.assertTrue(new_year.is_active)
+
+    def test_creating_active_year_deactivates_previous_year(self):
+
+        self.client.force_login(self.college_admin)
+
+        self.client.post(
+            reverse("academic_year_create"),
+            {
+                "name": "2027-2028",
+                "start_date": "2027-06-01",
+                "end_date": "2028-05-31",
+                "is_active": True,
+            },
+        )
+
+        self.academic_year.refresh_from_db()
+
+        self.assertFalse(self.academic_year.is_active)
+
+        new_year = AcademicYear.objects.get(
+            college=self.college,
+            name="2027-2028",
+        )
+
+        self.assertTrue(new_year.is_active)
+
+    def test_college_admin_can_edit_own_academic_year(self):
+
+        self.client.force_login(self.college_admin)
+
+        response = self.client.post(
+            reverse(
+                "academic_year_edit",
+                kwargs={"year_id": self.academic_year.pk},
+            ),
+            {
+                "name": "Updated Year 2026",
+                "start_date": "2026-06-01",
+                "end_date": "2027-05-31",
+                "is_active": True,
+            },
+        )
+
+        if response.status_code == 200:
+            self.fail(
+                f"Edit form validation failed. "
+                f"Errors: {response.context['form'].errors}"
+            )
+
+        self.assertEqual(response.status_code, 302)
+
+        self.academic_year.refresh_from_db()
+
+        self.assertEqual(
+            self.academic_year.name,
+            "Updated Year 2026",
+        )
+
+    def test_college_admin_can_only_see_own_academic_years(self):
+
+        self.client.force_login(self.college_admin)
+
+        response = self.client.get(
+            reverse("academic_year_list")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "2026-2027")
+
+        self.assertNotContains(
+            response,
+            "Green Valley College",
+        )
+
+        self.assertEqual(
+            list(response.context["academic_years"]),
+            [self.academic_year],
+        )
+
+    def test_college_admin_cannot_edit_other_college_academic_year(self):
+
+        self.client.force_login(self.other_college_admin)
+
+        response = self.client.get(
+            reverse(
+                "academic_year_edit",
+                kwargs={"year_id": self.academic_year.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_colleges_can_use_same_academic_year_name(self):
+
+        self.assertEqual(
+            self.academic_year.name,
+            self.other_academic_year.name,
+        )
+
+        self.assertNotEqual(
+            self.academic_year.college,
+            self.other_academic_year.college,
+        )
