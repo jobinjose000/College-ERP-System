@@ -1,11 +1,1069 @@
 
 {% extends "accounts/base.html" %}
-{% block title %}College Admin | College ERP{% endblock %}
+
+{% block title %}College Dashboard | College ERP{% endblock %}
+
 {% block content %}
-<h1 class="h3 fw-bold mb-2">College Dashboard</h1>
-<p class="text-secondary">Welcome, {{ request.user.username }}.</p>
-<div class="card erp-card p-4">
-    <h2 class="h5">College Administration</h2>
-    <p class="mb-0">Manage your college's students and faculty.</p>
+
+<!-- Dashboard Header -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 fw-bold mb-1">College Dashboard</h1>
+        <p class="text-secondary mb-0">
+            Welcome, {{ request.user.username }}.
+            Here's your college overview.
+        </p>
+    </div>
+
+    <div class="text-secondary small mt-2 mt-md-0 text-md-end">
+        <div>
+            <span class="fw-semibold text-muted">📅 Today:</span>
+            {{ today|date:"d M Y" }}
+        </div>
+
+        <div class="mt-1">
+            <span id="live-clock" class="fw-bold text-muted">
+                --:--:--
+            </span>
+            <small class="text-secondary">IST</small>
+        </div>
+    </div>
 </div>
+
+
+<!-- Main Statistics -->
+<div class="row g-4 mb-4">
+
+    <div class="col-md-6 col-xl-3">
+        <a href="{% url 'student_list' %}"
+           class="text-decoration-none text-dark">
+            <div class="card erp-card h-100 p-3 statistic-card">
+                <p class="text-secondary mb-1">Total Students</p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2 class="fw-bold mb-0">{{ total_students }}</h2>
+                    <span class="fs-1">🎓</span>
+                </div>
+                <small class="text-primary mt-3">View Students →</small>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <a href="{% url 'faculty_list' %}"
+           class="text-decoration-none text-dark">
+            <div class="card erp-card h-100 p-3 statistic-card">
+                <p class="text-secondary mb-1">Total Faculty</p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2 class="fw-bold mb-0">{{ total_faculty }}</h2>
+                    <span class="fs-1">👨‍🏫</span>
+                </div>
+                <small class="text-primary mt-3">View Faculty →</small>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card erp-card h-100 p-3 statistic-card">
+            <p class="text-secondary mb-1">Departments</p>
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="fw-bold mb-0">{{ total_departments }}</h2>
+                <span class="fs-1">🏢</span>
+            </div>
+            <small class="text-muted mt-3">Department management coming next</small>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card erp-card h-100 p-3 statistic-card">
+            <p class="text-secondary mb-1">Active Courses</p>
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="fw-bold mb-0">{{ total_courses }}</h2>
+                <span class="fs-1">📚</span>
+            </div>
+            <small class="text-muted mt-3">Course management coming next</small>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- Class Sections -->
+<div class="row mb-4">
+    <div class="col-md-6 col-xl-3">
+        <div class="card erp-card p-3 h-100 statistic-card">
+            <p class="text-secondary mb-1">Class Sections</p>
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="fw-bold mb-0">{{ total_classes }}</h2>
+                <span class="fs-1">🏫</span>
+            </div>
+            <small class="text-muted mt-3">Academic sections</small>
+        </div>
+    </div>
+</div>
+
+
+<!-- Faculty Availability -->
+<section class="mb-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="fw-bold mb-1">Faculty Availability</h4>
+            <p class="text-muted mb-0 small">
+                Click a faculty card to view details and today's timetable.
+            </p>
+        </div>
+
+        <span class="badge bg-primary rounded-pill">
+            {{ faculty_availability|length }} Faculty
+        </span>
+    </div>
+
+    <div class="row g-3">
+
+        {% for item in faculty_availability %}
+
+        <div class="col-12 col-md-6 col-xl-4">
+
+            <button type="button"
+                    class="card shadow-sm border-0 h-100 w-100 text-start faculty-card"
+                    data-bs-toggle="modal"
+                    data-bs-target="#facultyModal{{ item.profile.id }}">
+
+                <div class="card-body">
+
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h5 class="fw-bold mb-1">
+                                {{ item.profile.user.get_full_name|default:item.profile.user.username }}
+                            </h5>
+
+                            <small class="text-muted">
+                                ID: {{ item.profile.employee_id }}
+                            </small>
+                        </div>
+
+                        {% if item.status == "IN_CLASS" %}
+                            <span class="badge bg-success">In Class</span>
+                        {% elif item.status == "AVAILABLE" %}
+                            <span class="badge bg-primary">Available</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Not Scheduled</span>
+                        {% endif %}
+                    </div>
+
+                    <hr>
+
+                    <p class="mb-2">
+                        <strong>Department:</strong>
+                        {{ item.profile.department|default:"Not specified" }}
+                    </p>
+
+                    <p class="mb-2">
+                        <strong>Designation:</strong>
+                        {{ item.profile.designation|default:"Not specified" }}
+                    </p>
+
+                    {% if item.current_class %}
+                        <p class="mb-0">
+                            <strong>Current Subject:</strong>
+                            {{ item.current_class.course.name }}
+                        </p>
+                    {% else %}
+                        <p class="text-muted mb-0">No ongoing class</p>
+                    {% endif %}
+
+                    <div class="text-primary small fw-semibold mt-3">
+                        View Faculty Details →
+                    </div>
+
+                </div>
+            </button>
+
+        </div>
+
+
+        <!-- Faculty Details Modal -->
+        <div class="modal fade"
+             id="facultyModal{{ item.profile.id }}"
+             tabindex="-1"
+             aria-labelledby="facultyModalLabel{{ item.profile.id }}"
+             aria-hidden="true">
+
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content border-0 shadow">
+
+                    <div class="modal-header text-white"
+                         style="background:#14213d;">
+
+                        <div>
+                            <h5 class="modal-title fw-bold"
+                                id="facultyModalLabel{{ item.profile.id }}">
+                                {{ item.profile.user.get_full_name|default:item.profile.user.username }}
+                            </h5>
+
+                            <small>
+                                Faculty ID: {{ item.profile.employee_id }}
+                            </small>
+                        </div>
+
+                        <button type="button"
+                                class="btn-close btn-close-white"
+                                data-bs-dismiss="modal"
+                                aria-label="Close">
+                        </button>
+
+                    </div>
+
+                    <div class="modal-body">
+
+                        <h6 class="fw-bold mb-3">Faculty Information</h6>
+
+                        <div class="row g-3 mb-4">
+
+                            <div class="col-md-6">
+                                <small class="text-muted">Department</small>
+                                <div class="fw-semibold">
+                                    {{ item.profile.department|default:"Not specified" }}
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <small class="text-muted">Designation</small>
+                                <div class="fw-semibold">
+                                    {{ item.profile.designation|default:"Not specified" }}
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <small class="text-muted">Qualification</small>
+                                <div class="fw-semibold">
+                                    {{ item.profile.qualification|default:"Not specified" }}
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <small class="text-muted">Phone</small>
+                                <div class="fw-semibold">
+                                    {{ item.profile.phone|default:"Not provided" }}
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <hr>
+
+                        <h6 class="fw-bold mb-3">Today's Status</h6>
+
+                        {% if item.status == "IN_CLASS" %}
+                            <div class="alert alert-success">
+                                Currently teaching
+                                <strong>{{ item.current_class.course.name }}</strong>.
+                            </div>
+                        {% elif item.status == "AVAILABLE" %}
+                            <div class="alert alert-primary">
+                                No ongoing class at the current time.
+                            </div>
+                        {% else %}
+                            <div class="alert alert-secondary">
+                                No timetable entries scheduled for today.
+                            </div>
+                        {% endif %}
+
+                        <hr>
+
+                        <h6 class="fw-bold mb-3">Today's Timetable</h6>
+
+                        {% if item.schedule %}
+
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover align-middle">
+
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Period</th>
+                                            <th>Time</th>
+                                            <th>Subject</th>
+                                            <th>Class</th>
+                                            <th>Room</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        {% for entry in item.schedule %}
+                                        <tr>
+
+                                            <td>{{ entry.period.name }}</td>
+
+                                            <td>
+                                                {{ entry.period.start_time|time:"h:i A" }}
+                                                -
+                                                {{ entry.period.end_time|time:"h:i A" }}
+                                            </td>
+
+                                            <td>
+                                                <strong>{{ entry.course.code }}</strong>
+                                                <br>
+                                                <small>{{ entry.course.name }}</small>
+                                            </td>
+
+                                            <td>
+                                                {{ entry.class_section.name }}
+                                                <br>
+                                                <small>
+                                                    Semester {{ entry.class_section.semester }}
+                                                </small>
+                                            </td>
+
+                                            <td>
+                                                {{ entry.classroom|default:"Not assigned" }}
+                                            </td>
+
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+
+                                </table>
+                            </div>
+
+                        {% else %}
+
+                            <div class="text-center text-muted py-4">
+                                <p class="mb-1">No classes scheduled for today.</p>
+                                <small>
+                                    This faculty member has no timetable entries for this day.
+                                </small>
+                            </div>
+
+                        {% endif %}
+
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button"
+                                class="btn btn-secondary"
+                                data-bs-dismiss="modal">
+                            Close
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        {% empty %}
+
+        <div class="col-12">
+            <div class="alert alert-info">
+                No faculty members found for this college.
+            </div>
+        </div>
+
+        {% endfor %}
+
+    </div>
+</section>
+
+
+<!-- Today's Academic Activities -->
+<div class="card erp-card p-4 mb-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="h5 fw-bold mb-1">Today's Academic Activities</h2>
+            <p class="text-secondary mb-0">
+                Class schedule and teaching activities for today.
+            </p>
+        </div>
+        <span class="fs-2">📅</span>
+    </div>
+
+
+    <!-- Activity Cards -->
+    <div class="row g-3 mb-4">
+
+        <div class="col-md-4">
+            <button type="button"
+                    class="card bg-light border-0 rounded p-3 h-100 w-100 text-start activity-card"
+                    data-bs-toggle="modal"
+                    data-bs-target="#todayClassesModal">
+
+                <p class="text-secondary mb-1">Today's Classes</p>
+                <h3 class="fw-bold mb-0">{{ today_class_count }}</h3>
+                <small class="text-primary mt-3">View all today's classes →</small>
+
+            </button>
+        </div>
+
+        <div class="col-md-4">
+            <button type="button"
+                    class="card bg-light border-0 rounded p-3 h-100 w-100 text-start activity-card"
+                    data-bs-toggle="modal"
+                    data-bs-target="#ongoingClassesModal">
+
+                <p class="text-secondary mb-1">Ongoing Classes</p>
+                <h3 class="fw-bold text-success mb-0">
+                    {{ ongoing_classes.count }}
+                </h3>
+                <small class="text-primary mt-3">View ongoing classes →</small>
+
+            </button>
+        </div>
+
+        <div class="col-md-4">
+            <button type="button"
+                    class="card bg-light border-0 rounded p-3 h-100 w-100 text-start activity-card"
+                    data-bs-toggle="modal"
+                    data-bs-target="#upcomingClassesModal">
+
+                <p class="text-secondary mb-1">Upcoming Classes</p>
+                <h3 class="fw-bold text-primary mb-0">
+                    {{ upcoming_classes.count }}
+                </h3>
+                <small class="text-primary mt-3">View upcoming classes →</small>
+
+            </button>
+        </div>
+
+    </div>
+
+
+    <!-- Today's Classes Modal -->
+    <div class="modal fade" id="todayClassesModal" tabindex="-1"
+         aria-labelledby="todayClassesModalLabel" aria-hidden="true">
+
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+
+                <div class="modal-header text-white" style="background:#14213d;">
+                    <h5 class="modal-title" id="todayClassesModalLabel">
+                        Today's Classes
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    {% if today_sessions %}
+
+                        {% for session in today_sessions %}
+                        <div class="border rounded p-3 mb-3">
+
+                            <div class="d-flex justify-content-between">
+                                <strong>
+                                    {{ session.faculty_assignment.course.code }}
+                                </strong>
+
+                                {% if session.status == "CANCELLED" %}
+                                    <span class="badge bg-danger">Cancelled</span>
+                                {% elif session.status == "COMPLETED" %}
+                                    <span class="badge bg-secondary">Completed</span>
+                                {% elif session in ongoing_classes %}
+                                    <span class="badge bg-success">Ongoing</span>
+                                {% else %}
+                                    <span class="badge bg-primary">Scheduled</span>
+                                {% endif %}
+                            </div>
+
+                            <h6 class="mt-2">
+                                {{ session.faculty_assignment.course.name }}
+                            </h6>
+
+                            <p class="mb-1">
+                                <strong>Time:</strong>
+                                {{ session.start_time|time:"h:i A" }} -
+                                {{ session.end_time|time:"h:i A" }}
+                            </p>
+
+                            <p class="mb-1">
+                                <strong>Class:</strong>
+                                {{ session.class_section.department.name }}
+                                - Sem {{ session.class_section.semester }}
+                                - {{ session.class_section.name }}
+                            </p>
+
+                            <p class="mb-1">
+                                <strong>Faculty:</strong>
+                                {{ session.faculty_assignment.faculty.username }}
+                            </p>
+
+                            <p class="mb-0">
+                                <strong>Room:</strong>
+                                {{ session.classroom|default:"Not assigned" }}
+                            </p>
+
+                        </div>
+                        {% endfor %}
+
+                    {% else %}
+
+                        <div class="text-center text-muted py-4">
+                            No classes scheduled today.
+                        </div>
+
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Ongoing Classes Modal -->
+    <div class="modal fade" id="ongoingClassesModal" tabindex="-1"
+         aria-labelledby="ongoingClassesModalLabel" aria-hidden="true">
+
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+
+                <div class="modal-header text-white" style="background:#14213d;">
+                    <h5 class="modal-title" id="ongoingClassesModalLabel">
+                        Ongoing Classes
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    {% if ongoing_classes %}
+
+                        {% for session in ongoing_classes %}
+                        <div class="border rounded p-3 mb-3">
+
+                            <span class="badge bg-success">Currently Ongoing</span>
+
+                            <h6 class="mt-2">
+                                {{ session.faculty_assignment.course.code }}
+                                - {{ session.faculty_assignment.course.name }}
+                            </h6>
+
+                            <p class="mb-1">
+                                <strong>Time:</strong>
+                                {{ session.start_time|time:"h:i A" }} -
+                                {{ session.end_time|time:"h:i A" }}
+                            </p>
+
+                            <p class="mb-1">
+                                <strong>Class:</strong>
+                                {{ session.class_section.department.name }}
+                                - Sem {{ session.class_section.semester }}
+                                - {{ session.class_section.name }}
+                            </p>
+
+                            <p class="mb-1">
+                                <strong>Faculty:</strong>
+                                {{ session.faculty_assignment.faculty.username }}
+                            </p>
+
+                            <p class="mb-0">
+                                <strong>Room:</strong>
+                                {{ session.classroom|default:"Not assigned" }}
+                            </p>
+
+                        </div>
+                        {% endfor %}
+
+                    {% else %}
+
+                        <div class="text-center text-muted py-4">
+                            No classes are currently ongoing.
+                        </div>
+
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Upcoming Classes Modal -->
+    <div class="modal fade" id="upcomingClassesModal" tabindex="-1"
+         aria-labelledby="upcomingClassesModalLabel" aria-hidden="true">
+
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+
+                <div class="modal-header text-white" style="background:#14213d;">
+                    <h5 class="modal-title" id="upcomingClassesModalLabel">
+                        Upcoming Classes
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    {% if upcoming_classes %}
+
+                        {% for session in upcoming_classes %}
+                        <div class="border rounded p-3 mb-3">
+
+                            <span class="badge bg-primary">Upcoming</span>
+
+                            <h6 class="mt-2">
+                                {{ session.faculty_assignment.course.code }}
+                                - {{ session.faculty_assignment.course.name }}
+                            </h6>
+
+                            <p class="mb-1">
+                                <strong>Date:</strong>
+                                {{ session.date|date:"d M Y" }}
+                            </p>
+
+                            <p class="mb-1">
+                                <strong>Time:</strong>
+                                {{ session.start_time|time:"h:i A" }} -
+                                {{ session.end_time|time:"h:i A" }}
+                            </p>
+
+                            <p class="mb-1">
+                                <strong>Class:</strong>
+                                {{ session.class_section.department.name }}
+                                - Sem {{ session.class_section.semester }}
+                                - {{ session.class_section.name }}
+                            </p>
+
+                            <p class="mb-1">
+                                <strong>Faculty:</strong>
+                                {{ session.faculty_assignment.faculty.username }}
+                            </p>
+
+                            <p class="mb-0">
+                                <strong>Room:</strong>
+                                {{ session.classroom|default:"Not assigned" }}
+                            </p>
+
+                        </div>
+                        {% endfor %}
+
+                    {% else %}
+
+                        <div class="text-center text-muted py-4">
+                            No upcoming classes found.
+                        </div>
+
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Today's Class Schedule -->
+    <h3 class="h6 fw-bold mb-3">Today's Class Schedule</h3>
+
+    {% if today_sessions %}
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+
+                <thead class="table-light">
+                    <tr>
+                        <th>Time</th>
+                        <th>Subject</th>
+                        <th>Class</th>
+                        <th>Faculty</th>
+                        <th>Room</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for session in today_sessions %}
+                    <tr>
+
+                        <td>
+                            <div class="fw-semibold">
+                                {{ session.start_time|time:"h:i A" }}
+                            </div>
+                            <small class="text-secondary">
+                                {{ session.end_time|time:"h:i A" }}
+                            </small>
+                        </td>
+
+                        <td>
+                            <div class="fw-semibold">
+                                {{ session.faculty_assignment.course.code }}
+                            </div>
+                            <small class="text-secondary">
+                                {{ session.faculty_assignment.course.name }}
+                            </small>
+                        </td>
+
+                        <td>
+                            {{ session.class_section.department.name }}
+                            - Sem {{ session.class_section.semester }}
+                            - {{ session.class_section.name }}
+                        </td>
+
+                        <td>
+                            {{ session.faculty_assignment.faculty.username }}
+                        </td>
+
+                        <td>
+                            {{ session.classroom|default:"Not assigned" }}
+                        </td>
+
+                        <td>
+
+                            {% if session.status == "CANCELLED" %}
+                                <span class="badge text-bg-danger">Cancelled</span>
+                            {% elif session.status == "COMPLETED" %}
+                                <span class="badge text-bg-secondary">Completed</span>
+                            {% elif session in ongoing_classes %}
+                                <span class="badge text-bg-success">Ongoing</span>
+                            {% elif session in upcoming_classes %}
+                                <span class="badge text-bg-primary">Upcoming</span>
+                            {% else %}
+                                <span class="badge text-bg-light">Scheduled</span>
+                            {% endif %}
+
+                        </td>
+
+                    </tr>
+                    {% endfor %}
+
+                </tbody>
+            </table>
+        </div>
+
+    {% else %}
+
+        <div class="text-center py-4 bg-light rounded">
+            <div class="fs-1 mb-2">📚</div>
+            <h3 class="h6 fw-bold">No Classes Scheduled Today</h3>
+            <p class="text-secondary mb-0">
+                There are no class sessions scheduled for today.
+            </p>
+        </div>
+
+    {% endif %}
+
+</div>
+
+
+<!-- Attendance Overview -->
+<div class="card erp-card p-4 mb-4">
+
+    <div class="mb-3">
+        <h2 class="h5 fw-bold mb-1">Today's Attendance Overview</h2>
+        <p class="text-secondary mb-0">
+            Click a card to view the corresponding student attendance records.
+        </p>
+    </div>
+
+    <div class="row g-3">
+
+        <!-- Present -->
+        <div class="col-md-4">
+            <button type="button"
+                    class="card bg-light border-0 rounded p-3 h-100 w-100 text-start attendance-card"
+                    data-bs-toggle="modal"
+                    data-bs-target="#presentAttendanceModal">
+
+                <p class="text-secondary mb-1">Present</p>
+                <h3 class="fw-bold text-success mb-0">{{ present_count }}</h3>
+                <small class="text-primary mt-3">View present students →</small>
+
+            </button>
+        </div>
+
+        <!-- Absent -->
+        <div class="col-md-4">
+            <button type="button"
+                    class="card bg-light border-0 rounded p-3 h-100 w-100 text-start attendance-card"
+                    data-bs-toggle="modal"
+                    data-bs-target="#absentAttendanceModal">
+
+                <p class="text-secondary mb-1">Absent</p>
+                <h3 class="fw-bold text-danger mb-0">{{ absent_count }}</h3>
+                <small class="text-primary mt-3">View absent students →</small>
+
+            </button>
+        </div>
+
+        <!-- Late -->
+        <div class="col-md-4">
+            <button type="button"
+                    class="card bg-light border-0 rounded p-3 h-100 w-100 text-start attendance-card"
+                    data-bs-toggle="modal"
+                    data-bs-target="#lateAttendanceModal">
+
+                <p class="text-secondary mb-1">Late</p>
+                <h3 class="fw-bold text-warning mb-0">{{ late_count }}</h3>
+                <small class="text-primary mt-3">View late students →</small>
+
+            </button>
+        </div>
+
+    </div>
+
+
+    <!-- Present Students Modal -->
+    <div class="modal fade" id="presentAttendanceModal" tabindex="-1"
+         aria-labelledby="presentAttendanceModalLabel" aria-hidden="true">
+
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+
+                <div class="modal-header text-white" style="background:#14213d;">
+                    <h5 class="modal-title" id="presentAttendanceModalLabel">
+                        Present Students
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    {% if present_records %}
+
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Student</th>
+                                        <th>Registration No.</th>
+                                        <th>Class</th>
+                                        <th>Subject</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {% for record in present_records %}
+                                    <tr>
+                                        <td>
+                                            {{ record.student.user.get_full_name|default:record.student.user.username }}
+                                        </td>
+                                        <td>{{ record.student.registration_number }}</td>
+                                        <td>{{ record.class_session.class_section.name }}</td>
+                                        <td>{{ record.class_session.faculty_assignment.course.code }}</td>
+                                        <td><span class="badge bg-success">Present</span></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+
+                            </table>
+                        </div>
+
+                    {% else %}
+
+                        <div class="text-center text-muted py-4">
+                            No present attendance records found today.
+                        </div>
+
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Absent Students Modal -->
+    <div class="modal fade" id="absentAttendanceModal" tabindex="-1"
+         aria-labelledby="absentAttendanceModalLabel" aria-hidden="true">
+
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+
+                <div class="modal-header text-white" style="background:#14213d;">
+                    <h5 class="modal-title" id="absentAttendanceModalLabel">
+                        Absent Students
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    {% if absent_records %}
+
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Student</th>
+                                        <th>Registration No.</th>
+                                        <th>Class</th>
+                                        <th>Subject</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {% for record in absent_records %}
+                                    <tr>
+                                        <td>
+                                            {{ record.student.user.get_full_name|default:record.student.user.username }}
+                                        </td>
+                                        <td>{{ record.student.registration_number }}</td>
+                                        <td>{{ record.class_session.class_section.name }}</td>
+                                        <td>{{ record.class_session.faculty_assignment.course.code }}</td>
+                                        <td><span class="badge bg-danger">Absent</span></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+
+                            </table>
+                        </div>
+
+                    {% else %}
+
+                        <div class="text-center text-muted py-4">
+                            No absent attendance records found today.
+                        </div>
+
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Late Students Modal -->
+    <div class="modal fade" id="lateAttendanceModal" tabindex="-1"
+         aria-labelledby="lateAttendanceModalLabel" aria-hidden="true">
+
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+
+                <div class="modal-header text-white" style="background:#14213d;">
+                    <h5 class="modal-title" id="lateAttendanceModalLabel">
+                        Late Students
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    {% if late_records %}
+
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Student</th>
+                                        <th>Registration No.</th>
+                                        <th>Class</th>
+                                        <th>Subject</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {% for record in late_records %}
+                                    <tr>
+                                        <td>
+                                            {{ record.student.user.get_full_name|default:record.student.user.username }}
+                                        </td>
+                                        <td>{{ record.student.registration_number }}</td>
+                                        <td>{{ record.class_session.class_section.name }}</td>
+                                        <td>{{ record.class_session.faculty_assignment.course.code }}</td>
+                                        <td><span class="badge bg-warning text-dark">Late</span></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+
+                            </table>
+                        </div>
+
+                    {% else %}
+
+                        <div class="text-center text-muted py-4">
+                            No late attendance records found today.
+                        </div>
+
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- Dashboard Styles -->
+<style>
+    .statistic-card,
+    .faculty-card,
+    .activity-card,
+    .attendance-card {
+        border-radius: 12px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .statistic-card:hover,
+    .faculty-card:hover,
+    .activity-card:hover,
+    .attendance-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12) !important;
+    }
+
+    a .statistic-card,
+    .faculty-card,
+    .activity-card,
+    .attendance-card {
+        cursor: pointer;
+    }
+
+    .faculty-card {
+        background: #ffffff;
+    }
+
+    .faculty-card:focus-visible,
+    .activity-card:focus-visible,
+    .attendance-card:focus-visible {
+        outline: 3px solid #0d6efd;
+        outline-offset: 3px;
+    }
+
+    .modal-content {
+        border-radius: 12px;
+    }
+
+    .modal-header {
+        border-radius: 12px 12px 0 0;
+    }
+</style>
+
+
+<!-- Live Clock -->
+<script>
+    function updateLiveClock() {
+        const clockElement = document.getElementById("live-clock");
+
+        if (!clockElement) {
+            return;
+        }
+
+        const now = new Date();
+
+        const time = now.toLocaleTimeString("en-IN", {
+            timeZone: "Asia/Kolkata",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true
+        });
+
+        clockElement.textContent = time;
+    }
+
+    updateLiveClock();
+    setInterval(updateLiveClock, 1000);
+</script>
+
 {% endblock %}

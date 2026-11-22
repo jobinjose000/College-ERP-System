@@ -11,10 +11,24 @@ from .forms import (
     StudentManagementForm,
     FacultyManagementForm,
 )
-from .models import StudentProfile, FacultyProfile
 from .permissions import role_required
 
-from academics.models import FacultyAssignment, Timetable, Enrollment
+from accounts.models import StudentProfile, FacultyProfile
+from academics.models import (
+    FacultyAssignment,
+    Timetable,
+    Enrollment,
+    Department,
+    Course,
+    ClassSection,
+    ClassSession,
+    Attendance,
+)
+
+from django.utils import timezone
+
+from academics.models import ClassSession, Attendance
+from django.db.models import Q
 
 User = get_user_model()
 
@@ -55,13 +69,218 @@ def super_admin_dashboard(request):
     )
 
 
+
+
+
 @login_required
 @role_required(User.Role.COLLEGE_ADMIN)
 def college_admin_dashboard(request):
+    college = request.user.college
+
+    # Student statistics
+    total_students = StudentProfile.objects.filter(
+        user__college=college,
+        user__role=User.Role.STUDENT,
+        user__is_active=True,
+    ).count()
+
+    # Faculty statistics
+    total_faculty = FacultyProfile.objects.filter(
+        user__college=college,
+        user__role=User.Role.FACULTY,
+        user__is_active=True,
+    ).count()
+
+    # Academic statistics
+    total_departments = Department.objects.filter(
+        college=college,
+    ).count()
+
+    total_courses = Course.objects.filter(
+        college=college,
+        is_active=True,
+    ).count()
+
+    total_classes = ClassSection.objects.filter(
+        college=college,
+    ).count()
+
+    # Current local date and time
+    current_datetime = timezone.localtime()
+    today = current_datetime.date()
+    current_time = current_datetime.time().replace(tzinfo=None)
+
+    # Today's class sessions
+    today_sessions = ClassSession.objects.filter(
+        faculty_assignment__college=college,
+        class_section__college=college,
+        date=today,
+    ).select_related(
+        "class_section",
+        "class_section__department",
+        "faculty_assignment",
+        "faculty_assignment__faculty",
+        "faculty_assignment__course",
+    ).order_by("start_time")
+
+    # Classes currently in progress
+    ongoing_classes = today_sessions.filter(
+        status=ClassSession.Status.SCHEDULED,
+        start_time__lte=current_time,
+        end_time__gt=current_time,
+    )
+
+    # Upcoming classes for today
+    upcoming_classes = ClassSession.objects.filter(
+    faculty_assignment__college=college,
+    class_section__college=college,
+    status=ClassSession.Status.SCHEDULED,
+    ).filter(
+        Q(date__gt=today)
+        | Q(date=today, start_time__gt=current_time)
+    ).select_related(
+        "class_section",
+        "faculty_assignment",
+        "faculty_assignment__faculty",
+        "faculty_assignment__course",
+    ).order_by("date", "start_time")[:5]
+
+    
+    # Faculty availability based on today's timetable
+    weekday_codes = {
+        0: Timetable.Weekday.MONDAY,
+        1: Timetable.Weekday.TUESDAY,
+        2: Timetable.Weekday.WEDNESDAY,
+        3: Timetable.Weekday.THURSDAY,
+        4: Timetable.Weekday.FRIDAY,
+        5: Timetable.Weekday.SATURDAY,
+    }
+
+    today_weekday = weekday_codes.get(today.weekday())
+
+    faculty_profiles = FacultyProfile.objects.filter(
+        user__college=college,
+        user__role=User.Role.FACULTY,
+        user__is_active=True,
+    ).select_related("user").order_by("employee_id")
+
+    faculty_availability = []
+
+    for profile in faculty_profiles:
+
+        # Get all timetable entries for this faculty member today
+        schedule = Timetable.objects.filter(
+            college=college,
+            faculty=profile.user,
+            weekday=today_weekday,
+            is_active=True,
+        ).select_related(
+            "course",
+            "period",
+            "class_section",
+            "class_section__department",
+            "academic_year",
+        ).order_by("period__number")
+
+        # Find the class currently in progress
+        current_class = schedule.filter(
+            period__start_time__lte=current_time,
+            period__end_time__gt=current_time,
+        ).first()
+
+        if current_class:
+            availability_status = "IN_CLASS"
+
+        elif schedule.exists():
+            availability_status = "AVAILABLE"
+
+        else:
+            availability_status = "NOT_SCHEDULED"
+
+        faculty_availability.append({
+            "profile": profile,
+            "status": availability_status,
+            "current_class": current_class,
+            "schedule": schedule,
+        })
+
+
+    # Today's attendance records
+    today_attendance = Attendance.objects.filter(
+        class_session__faculty_assignment__college=college,
+        class_session__class_section__college=college,
+        class_session__date=today,
+    )
+
+    present_count = today_attendance.filter(
+        status=Attendance.Status.PRESENT,
+    ).count()
+
+    absent_count = today_attendance.filter(
+        status=Attendance.Status.ABSENT,
+    ).count()
+
+    late_count = today_attendance.filter(
+        status=Attendance.Status.LATE,
+    ).count()
+
+        # Attendance records grouped by status
+    attendance_related_fields = [
+        "student__user",
+        "class_session__class_section",
+        "class_session__class_section__department",
+        "class_session__faculty_assignment__course",
+    ]
+
+    present_records = today_attendance.filter(
+        status=Attendance.Status.PRESENT,
+    ).select_related(*attendance_related_fields).order_by(
+        "student__registration_number"
+    )
+
+    absent_records = today_attendance.filter(
+        status=Attendance.Status.ABSENT,
+    ).select_related(*attendance_related_fields).order_by(
+        "student__registration_number"
+    )
+
+    late_records = today_attendance.filter(
+        status=Attendance.Status.LATE,
+    ).select_related(*attendance_related_fields).order_by(
+        "student__registration_number"
+    )
+
     return render(
         request,
         "accounts/college_admin_dashboard.html",
+        {
+            "total_students": total_students,
+            "total_faculty": total_faculty,
+            "total_departments": total_departments,
+            "total_courses": total_courses,
+            "total_classes": total_classes,
+
+            "today": today,
+            "today_sessions": today_sessions,
+            "today_class_count": today_sessions.count(),
+            "ongoing_classes": ongoing_classes,
+            "upcoming_classes": upcoming_classes,
+
+            "present_count": present_count,
+            "absent_count": absent_count,
+            "late_count": late_count,
+            "present_records": present_records,
+            "absent_records": absent_records,
+            "late_records": late_records,
+
+            "faculty_availability": faculty_availability,
+        },
     )
+
+
+
+
+
 
 
 @login_required
