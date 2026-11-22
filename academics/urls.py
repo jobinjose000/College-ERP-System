@@ -48,7 +48,7 @@ urlpatterns = [
         name="timetable_create",
     ),
 
-        # Academic Year Management
+    # Academic Year Management
     path(
         "academic-years/",
         views.academic_year_list,
@@ -63,5 +63,22 @@ urlpatterns = [
         "academic-years/<int:year_id>/edit/",
         views.academic_year_edit,
         name="academic_year_edit",
+    ),
+
+    # Department Management
+    path(
+        "departments/",
+        views.department_list,
+        name="department_list",
+    ),
+    path(
+        "departments/add/",
+        views.department_create,
+        name="department_create",
+    ),
+    path(
+        "departments/<int:department_id>/edit/",
+        views.department_edit,
+        name="department_edit",
     ),
 ]

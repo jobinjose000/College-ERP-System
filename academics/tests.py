@@ -7,7 +7,7 @@ from django.urls import reverse
 from accounts.models import StudentProfile, User
 from core.models import College
 
-from .forms import EnrollmentForm
+from .forms import EnrollmentForm , DepartmentForm
 from .models import (
     AcademicYear,
     ClassSection,
@@ -553,3 +553,264 @@ class AcademicYearManagementTests(TestCase):
             self.academic_year.college,
             self.other_academic_year.college,
         )
+
+
+class DepartmentManagementTests(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+
+        cls.college = College.objects.create(
+            name="ABC College of Engineering",
+            code="department-test-abc",
+            email="abc-department@example.com",
+            address="Kollam",
+        )
+
+        cls.other_college = College.objects.create(
+            name="Green Valley College",
+            code="department-test-green",
+            email="green-department@example.com",
+            address="Kochi",
+        )
+
+        cls.college_admin = User.objects.create_user(
+            username="department_admin",
+            password="testpassword123",
+            role=User.Role.COLLEGE_ADMIN,
+            college=cls.college,
+        )
+
+        cls.other_college_admin = User.objects.create_user(
+            username="green_department_admin",
+            password="testpassword123",
+            role=User.Role.COLLEGE_ADMIN,
+            college=cls.other_college,
+        )
+
+        cls.faculty = User.objects.create_user(
+            username="department_faculty",
+            password="testpassword123",
+            role=User.Role.FACULTY,
+            college=cls.college,
+        )
+
+        cls.student = User.objects.create_user(
+            username="department_student",
+            password="testpassword123",
+            role=User.Role.STUDENT,
+            college=cls.college,
+        )
+
+        cls.super_admin = User.objects.create_user(
+            username="department_super_admin",
+            password="testpassword123",
+            role=User.Role.SUPER_ADMIN,
+        )
+
+        cls.department = Department.objects.create(
+            college=cls.college,
+            name="Computer Science",
+            code="CSE",
+        )
+
+        cls.other_department = Department.objects.create(
+            college=cls.other_college,
+            name="Computer Science",
+            code="CSE",
+        )
+
+    def test_college_admin_can_view_own_departments(self):
+
+        self.client.force_login(self.college_admin)
+
+        response = self.client.get(
+            reverse("department_list")
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertContains(response, "Computer Science")
+
+        self.assertEqual(
+            list(response.context["departments"]),
+            [self.department],
+        )
+
+    def test_college_admin_can_create_department(self):
+
+        self.client.force_login(self.college_admin)
+
+        response = self.client.post(
+            reverse("department_create"),
+            {
+                "name": "Electronics and Communication",
+                "code": "ECE",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        department = Department.objects.get(
+            college=self.college,
+            code="ECE",
+        )
+
+        self.assertEqual(
+            department.name,
+            "Electronics and Communication",
+        )
+
+        self.assertEqual(
+            department.college,
+            self.college,
+        )
+
+    def test_college_admin_can_edit_own_department(self):
+
+        self.client.force_login(self.college_admin)
+
+        response = self.client.post(
+            reverse(
+                "department_edit",
+                kwargs={"department_id": self.department.pk},
+            ),
+            {
+                "name": "Computer Engineering",
+                "code": "CE",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        self.department.refresh_from_db()
+
+        self.assertEqual(
+            self.department.name,
+            "Computer Engineering",
+        )
+
+        self.assertEqual(
+            self.department.code,
+            "CE",
+        )
+
+    def test_college_admin_cannot_view_other_college_departments(self):
+
+        self.client.force_login(self.college_admin)
+
+        response = self.client.get(
+            reverse("department_list")
+        )
+
+        self.assertNotContains(
+            response,
+            "Green Valley College",
+        )
+
+        self.assertNotIn(
+            self.other_department,
+            response.context["departments"],
+        )
+
+    def test_college_admin_cannot_edit_other_college_department(self):
+
+        self.client.force_login(self.college_admin)
+
+        response = self.client.get(
+            reverse(
+                "department_edit",
+                kwargs={"department_id": self.other_department.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_duplicate_department_name_is_rejected(self):
+
+        self.client.force_login(self.college_admin)
+
+        response = self.client.post(
+            reverse("department_create"),
+            {
+                "name": "Computer Science",
+                "code": "NEW-CODE",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertFalse(
+            Department.objects.filter(
+                college=self.college,
+                code="NEW-CODE",
+            ).exists()
+        )
+
+    def test_duplicate_department_code_is_rejected(self):
+
+        self.client.force_login(self.college_admin)
+
+        response = self.client.post(
+            reverse("department_create"),
+            {
+                "name": "Information Technology",
+                "code": "CSE",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertFalse(
+            Department.objects.filter(
+                college=self.college,
+                name="Information Technology",
+            ).exists()
+        )
+
+    def test_different_colleges_can_use_same_department_name_and_code(self):
+
+        self.assertEqual(
+            self.department.name,
+            self.other_department.name,
+        )
+
+        self.assertEqual(
+            self.department.code,
+            self.other_department.code,
+        )
+
+        self.assertNotEqual(
+            self.department.college,
+            self.other_department.college,
+        )
+
+    def test_faculty_cannot_access_department_management(self):
+
+        self.client.force_login(self.faculty)
+
+        response = self.client.get(
+            reverse("department_list")
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_student_cannot_access_department_management(self):
+
+        self.client.force_login(self.student)
+
+        response = self.client.get(
+            reverse("department_list")
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_super_admin_cannot_access_department_management(self):
+
+        self.client.force_login(self.super_admin)
+
+        response = self.client.get(
+            reverse("department_list")
+        )
+
+        self.assertEqual(response.status_code, 403)

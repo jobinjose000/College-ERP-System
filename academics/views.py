@@ -12,6 +12,7 @@ from .forms import (
     EnrollmentForm,
     TimetableForm,
     AcademicYearForm,
+    DepartmentForm,
 )
 from .models import (
     Enrollment,
@@ -20,6 +21,7 @@ from .models import (
     ClassSession,
     Timetable,
     AcademicYear,
+    Department,
 )
 
 
@@ -484,5 +486,118 @@ def academic_year_edit(request, year_id):
         {
             "form": form,
             "title": "Edit Academic Year",
+        },
+    )
+
+
+# --------------------------------------------------
+# DEPARTMENT MANAGEMENT
+# --------------------------------------------------
+
+@login_required
+@role_required(User.Role.COLLEGE_ADMIN)
+def department_list(request):
+
+    departments = Department.objects.filter(
+        college=request.user.college
+    ).order_by("name")
+
+    return render(
+        request,
+        "academics/department_list.html",
+        {
+            "departments": departments,
+        },
+    )
+
+
+@login_required
+@role_required(User.Role.COLLEGE_ADMIN)
+def department_create(request):
+
+    if request.method == "POST":
+        form = DepartmentForm(
+            request.POST,
+            user=request.user,
+        )
+
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    department = form.save(commit=False)
+                    department.college = request.user.college
+                    department.full_clean()
+                    department.save()
+
+                messages.success(
+                    request,
+                    "Department created successfully.",
+                )
+
+                return redirect("department_list")
+
+            except ValidationError as error:
+                form.add_error(None, error)
+
+    else:
+        form = DepartmentForm(user=request.user)
+
+    return render(
+        request,
+        "academics/department_form.html",
+        {
+            "form": form,
+            "title": "Create Department",
+        },
+    )
+
+
+@login_required
+@role_required(User.Role.COLLEGE_ADMIN)
+def department_edit(request, department_id):
+
+    department = get_object_or_404(
+        Department,
+        id=department_id,
+        college=request.user.college,
+    )
+
+    if request.method == "POST":
+        form = DepartmentForm(
+            request.POST,
+            instance=department,
+            user=request.user,
+        )
+
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    updated_department = form.save(commit=False)
+                    updated_department.college = request.user.college
+                    updated_department.full_clean()
+                    updated_department.save()
+
+                messages.success(
+                    request,
+                    "Department updated successfully.",
+                )
+
+                return redirect("department_list")
+
+            except ValidationError as error:
+                form.add_error(None, error)
+
+    else:
+        form = DepartmentForm(
+            instance=department,
+            user=request.user,
+        )
+
+    return render(
+        request,
+        "academics/department_form.html",
+        {
+            "form": form,
+            "title": "Edit Department",
         },
     )

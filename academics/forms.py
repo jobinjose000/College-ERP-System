@@ -3,6 +3,7 @@ from django import forms
 
 from accounts.models import StudentProfile, User
 from .models import (
+    Department,
     AcademicYear,
     ClassSection,
     Enrollment,
@@ -12,6 +13,51 @@ from .models import (
     FacultyAssignment,
     Timetable,
 )
+
+
+class DepartmentForm(forms.ModelForm):
+
+    class Meta:
+        model = Department
+        fields = [
+            "name",
+            "code",
+        ]
+
+        widgets = {
+            "name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Example: Computer Science",
+                }
+            ),
+            "code": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Example: CSE",
+                }
+            ),
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if user is None or user.college is None:
+            raise ValueError(
+                "A College Admin account is required."
+            )
+
+        self.user = user
+
+    def save(self, commit=True):
+        department = super().save(commit=False)
+        department.college = self.user.college
+
+        if commit:
+            department.full_clean()
+            department.save()
+
+        return department
 
 
 class EnrollmentForm(forms.ModelForm):
@@ -148,7 +194,6 @@ class TimetableForm(forms.ModelForm):
             timetable.save()
 
         return timetable
-
 
 
 class AcademicYearForm(forms.ModelForm):
