@@ -1,0 +1,145 @@
+
+{% extends "accounts/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold">Mark Attendance</h2>
+            <p class="text-muted mb-0">
+                Record attendance for this class period.
+            </p>
+        </div>
+        <a href="{% url 'faculty_dashboard' %}" class="btn btn-outline-secondary">
+            Back to Dashboard
+        </a>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="fw-bold">
+                {{ session.faculty_assignment.course.code }} -
+                {{ session.faculty_assignment.course.name }}
+            </h5>
+
+            <p class="mb-1">
+                <strong>Department:</strong>
+                {{ session.class_section.department.name }}
+            </p>
+
+            <p class="mb-1">
+                <strong>Class:</strong>
+                Semester {{ session.class_section.semester }},
+                Section {{ session.class_section.name }}
+            </p>
+
+            <p class="mb-1">
+                <strong>Date:</strong> {{ session.date }}
+            </p>
+
+            <p class="mb-1">
+                <strong>Period:</strong> {{ session.period_number }}
+            </p>
+
+            <p class="mb-1">
+                <strong>Time:</strong>
+                {{ session.start_time }} - {{ session.end_time }}
+            </p>
+
+            <p class="mb-0">
+                <strong>Classroom:</strong>
+                {{ session.classroom|default:"Not assigned" }}
+            </p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Student Attendance</h5>
+        </div>
+
+        <div class="card-body">
+
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Sl. No.</th>
+                                <th>Registration Number</th>
+                                <th>Student Name</th>
+                                <th style="width: 200px;">Attendance Status</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for enrollment in enrollments %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+
+                                <td>
+                                    {{ enrollment.student.registration_number }}
+                                </td>
+
+                                <td>
+                                    {{ enrollment.student.user.get_full_name|default:enrollment.student.user.username }}
+                                </td>
+
+                                <td>
+                                    <select
+                                        name="status_{{ enrollment.student.id }}"
+                                        class="form-select"
+                                    >
+                                        <option value=""
+                                            {% if not enrollment.attendance_status %}selected{% endif %}>
+                                            -- Not Marked --
+                                        </option>
+
+                                        <option value="PRESENT"
+                                            {% if enrollment.attendance_status == "PRESENT" %}selected{% endif %}>
+                                            Present
+                                        </option>
+
+                                        <option value="ABSENT"
+                                            {% if enrollment.attendance_status == "ABSENT" %}selected{% endif %}>
+                                            Absent
+                                        </option>
+
+                                        {% if session.period_number == 1 %}
+                                        <option value="LATE"
+                                            {% if enrollment.attendance_status == "LATE" %}selected{% endif %}>
+                                            Late
+                                        </option>
+                                        {% endif %}
+                                    </select>
+                                </td>
+                            </tr>
+
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">
+                                    No active students enrolled in this class.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% if enrollments %}
+                <div class="text-end mt-3">
+                    <button type="submit" class="btn btn-success">
+                        Save Attendance
+                    </button>
+                </div>
+                {% endif %}
+
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

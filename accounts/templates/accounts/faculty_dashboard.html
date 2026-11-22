@@ -64,11 +64,19 @@
                 {{ assignment.course.credits }}
             </p>
 
-            <a href="{% url 'assigned_class_students' assignment.id %}"
-               class="btn btn-outline-primary w-100 mt-3">
-                <i class="bi bi-people"></i>
-                View Students
-            </a>
+            
+            <div class="d-flex gap-2 mt-3">
+                <a href="{% url 'assigned_class_students' assignment.id %}"
+                class="btn btn-outline-primary w-50">
+                    View Students
+                </a>
+
+                <a href="{% url 'faculty_sessions' assignment.id %}"
+                class="btn btn-primary w-50">
+                    View Sessions
+                </a>
+            </div>
+
 
         </div>
     </div>

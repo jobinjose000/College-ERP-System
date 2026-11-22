@@ -3,7 +3,9 @@ from django.contrib import admin
 
 from .models import (
     AcademicYear,
+    Attendance,
     ClassSection,
+    ClassSession,
     Course,
     Department,
     Enrollment,
@@ -92,3 +94,62 @@ class EnrollmentAdmin(admin.ModelAdmin):
         "student__registration_number",
         "student__user__username",
     )
+
+
+@admin.register(Attendance)
+class AttendanceAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "student",
+        "class_session",
+        "status",
+        "created_at",
+    )
+
+    list_filter = (
+        "status",
+        "class_session__date",
+        "class_session__period_number",
+        "class_session__faculty_assignment__college",
+        "class_session__faculty_assignment__course",
+    )
+
+    search_fields = (
+        "student__registration_number",
+        "student__user__username",
+        "class_session__faculty_assignment__course__code",
+        "class_session__faculty_assignment__faculty__username",
+    )
+
+    date_hierarchy = "class_session__date"
+
+
+@admin.register(ClassSession)
+class ClassSessionAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "class_section",
+        "faculty_assignment",
+        "date",
+        "period_number",
+        "start_time",
+        "end_time",
+        "status",
+    )
+
+    list_filter = (
+        "date",
+        "status",
+        "period_number",
+        "class_section__college",
+    )
+
+    search_fields = (
+        "class_section__name",
+        "faculty_assignment__course__code",
+        "faculty_assignment__faculty__username",
+        "topic",
+    )
+
+    date_hierarchy = "date"
+    

@@ -293,3 +293,169 @@ class Enrollment(models.Model):
             f"{self.student.registration_number} - "
             f"{self.class_section}"
         )
+
+
+
+class Attendance(models.Model):
+
+    class Status(models.TextChoices):
+        PRESENT = "PRESENT", "Present"
+        ABSENT = "ABSENT", "Absent"
+        LATE = "LATE", "Late"
+
+    student = models.ForeignKey(
+        StudentProfile,
+        on_delete=models.PROTECT,
+        related_name="attendance_records",
+    )
+
+    class_session = models.ForeignKey(
+        "ClassSession",
+        on_delete=models.PROTECT,
+        related_name="attendance_records",
+        null=True,
+        blank=True,
+    )
+
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.PRESENT,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "class_session"],
+                name="unique_student_attendance_per_session",
+            ),
+        ]
+        ordering = ["student__registration_number"]
+
+    def clean(self):
+        if not self.student_id or not self.class_session_id:
+            return
+
+        session = self.class_session
+        assignment = session.faculty_assignment
+
+        if self.student.user.role != "STUDENT":
+            raise ValidationError(
+                "Attendance can only be recorded for students."
+            )
+
+        if self.student.user.college_id != assignment.college_id:
+            raise ValidationError(
+                "Student and class session must belong to the same college."
+            )
+
+        if not Enrollment.objects.filter(
+            student=self.student,
+            academic_year=session.class_section.academic_year,
+            class_section=session.class_section,
+            is_active=True,
+        ).exists():
+            raise ValidationError(
+                "Student must be actively enrolled in this class."
+            )
+
+        if self.status == self.Status.LATE and session.period_number != 1:
+            raise ValidationError(
+                "Late attendance is only allowed in Period 1."
+            )
+
+    def __str__(self):
+        return (
+            f"{self.student.registration_number} - "
+            f"{self.class_session} - {self.status}"
+        )
+
+
+
+
+class ClassSession(models.Model):
+
+    class Status(models.TextChoices):
+        SCHEDULED = "SCHEDULED", "Scheduled"
+        COMPLETED = "COMPLETED", "Completed"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    class_section = models.ForeignKey(
+        ClassSection,
+        on_delete=models.PROTECT,
+        related_name="class_sessions",
+    )
+
+    faculty_assignment = models.ForeignKey(
+        FacultyAssignment,
+        on_delete=models.PROTECT,
+        related_name="class_sessions",
+    )
+
+    date = models.DateField()
+
+    period_number = models.PositiveSmallIntegerField()
+
+    start_time = models.TimeField()
+
+    end_time = models.TimeField()
+
+    classroom = models.CharField(
+        max_length=50,
+        blank=True,
+    )
+
+    status = models.CharField(
+        max_length=15,
+        choices=Status.choices,
+        default=Status.SCHEDULED,
+    )
+
+    topic = models.CharField(
+        max_length=200,
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "class_section",
+                    "date",
+                    "period_number",
+                ],
+                name="unique_class_section_period_per_day",
+            ),
+        ]
+        ordering = ["date", "period_number"]
+
+    def clean(self):
+
+        if not self.class_section_id or not self.faculty_assignment_id:
+            return
+
+        assignment = self.faculty_assignment
+
+        if assignment.class_section_id != self.class_section_id:
+            raise ValidationError(
+                "Faculty assignment must belong to this class section."
+            )
+
+        if assignment.college_id != self.class_section.college_id:
+            raise ValidationError(
+                "Faculty assignment and class must belong to the same college."
+            )
+
+        if self.end_time <= self.start_time:
+            raise ValidationError(
+                "End time must be after start time."
+            )
+
+    def __str__(self):
+        return (
+            f"{self.class_section} - "
+            f"Period {self.period_number} - "
+            f"{self.date}"
+        )

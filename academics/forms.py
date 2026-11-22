@@ -1,7 +1,8 @@
+
 from django import forms
 
 from accounts.models import StudentProfile
-from .models import AcademicYear, ClassSection, Enrollment
+from .models import AcademicYear, ClassSection, Enrollment, Attendance
 
 
 class EnrollmentForm(forms.ModelForm):
@@ -53,3 +54,15 @@ class EnrollmentForm(forms.ModelForm):
                 ClassSection.objects
                 .filter(college=user.college)
             )
+
+
+class AttendanceDateForm(forms.Form):
+
+    date = forms.DateField(
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control",
+            }
+        )
+    )
