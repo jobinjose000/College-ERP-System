@@ -30,13 +30,21 @@ urlpatterns = [
         views.mark_attendance,
         name="mark_attendance",
     ),
-
-
     path(
         "faculty/assignments/<int:assignment_id>/sessions/",
         views.faculty_sessions,
         name="faculty_sessions",
     ),
 
-
+    # Timetable Management
+    path(
+        "timetable/",
+        views.timetable_list,
+        name="timetable_list",
+    ),
+    path(
+        "timetable/add/",
+        views.timetable_create,
+        name="timetable_create",
+    ),
 ]

@@ -137,6 +137,11 @@
                     📋 Student Enrollments
                 </a>
 
+                <a href="{% url 'timetable_list' %}">
+                    📅 Class Timetable
+                </a>
+                
+
             {% endif %}
 
             {% if request.user.role == "COLLEGE_ADMIN" %}
@@ -162,6 +167,9 @@
                 <a href="{% url 'enrollment_list' %}">
                     📋 Student Enrollments
                 </a>
+
+                <a href="{% url 'timetable_list' %}">
+                    📅 Class Timetable
 
             {% endif %}
 

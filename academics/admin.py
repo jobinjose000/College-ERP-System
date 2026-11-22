@@ -10,6 +10,8 @@ from .models import (
     Department,
     Enrollment,
     FacultyAssignment,
+    Period,
+    Timetable,
 )
 
 
@@ -152,4 +154,51 @@ class ClassSessionAdmin(admin.ModelAdmin):
     )
 
     date_hierarchy = "date"
-    
+
+@admin.register(Period)
+class PeriodAdmin(admin.ModelAdmin):
+    list_display = (
+        "college",
+        "number",
+        "name",
+        "start_time",
+        "end_time",
+        "is_active",
+    )
+    list_filter = ("college", "is_active")
+    search_fields = ("college__name", "name")
+    ordering = ("college", "number")
+
+@admin.register(Timetable)
+class TimetableAdmin(admin.ModelAdmin):
+    list_display = (
+        "college",
+        "weekday",
+        "class_section",
+        "period",
+        "course",
+        "faculty",
+        "classroom",
+        "is_active",
+    )
+
+    list_filter = (
+        "college",
+        "weekday",
+        "academic_year",
+        "is_active",
+    )
+
+    search_fields = (
+        "class_section__name",
+        "course__name",
+        "course__code",
+        "faculty__username",
+        "classroom",
+    )
+
+    ordering = (
+        "college",
+        "weekday",
+        "period__number",
+    )

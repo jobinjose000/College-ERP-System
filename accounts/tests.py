@@ -11,6 +11,18 @@ from accounts.permissions import (
 )
 from core.models import College
 
+from datetime import date, time
+
+from academics.models import (
+    Department,
+    AcademicYear,
+    Course,
+    ClassSection,
+    FacultyAssignment,
+    Enrollment,
+    Period,
+    Timetable,
+)
 
 class CollegePermissionTests(TestCase):
     def setUp(self):
@@ -577,3 +589,193 @@ class FacultyManagementTests(TestCase):
 
         self.assertEqual(list_response.status_code, 403)
         self.assertEqual(create_response.status_code, 403)
+
+
+class TimetableDashboardTests(TestCase):
+    def setUp(self):
+        self.college = College.objects.create(
+            name="Timetable Test College",
+            code="timetable-test",
+        )
+
+        self.department = Department.objects.create(
+            college=self.college,
+            name="Computer Science",
+            code="CSE",
+        )
+
+        self.academic_year = AcademicYear.objects.create(
+            college=self.college,
+            name="2026-2027",
+            start_date=date(2026, 6, 1),
+            end_date=date(2027, 5, 31),
+            is_active=True,
+        )
+
+        self.course = Course.objects.create(
+            college=self.college,
+            department=self.department,
+            code="CS101",
+            name="Programming",
+            credits=3,
+            semester=1,
+        )
+
+        self.section_a = ClassSection.objects.create(
+            college=self.college,
+            academic_year=self.academic_year,
+            department=self.department,
+            name="A",
+            semester=1,
+        )
+
+        self.section_b = ClassSection.objects.create(
+            college=self.college,
+            academic_year=self.academic_year,
+            department=self.department,
+            name="B",
+            semester=1,
+        )
+
+        self.faculty_a = User.objects.create_user(
+            username="timetable_faculty_a",
+            password="TestPass123!",
+            role=User.Role.FACULTY,
+            college=self.college,
+        )
+
+        self.faculty_b = User.objects.create_user(
+            username="timetable_faculty_b",
+            password="TestPass123!",
+            role=User.Role.FACULTY,
+            college=self.college,
+        )
+
+        self.student = User.objects.create_user(
+            username="timetable_student",
+            password="TestPass123!",
+            role=User.Role.STUDENT,
+            college=self.college,
+        )
+
+        self.student_profile = StudentProfile.objects.create(
+            user=self.student,
+            registration_number="TIME-001",
+            department="Computer Science",
+            admission_year=2026,
+        )
+
+        self.assignment_a = FacultyAssignment.objects.create(
+            college=self.college,
+            faculty=self.faculty_a,
+            course=self.course,
+            class_section=self.section_a,
+        )
+
+        self.assignment_b = FacultyAssignment.objects.create(
+            college=self.college,
+            faculty=self.faculty_b,
+            course=self.course,
+            class_section=self.section_b,
+        )
+
+        self.period_one = Period.objects.create(
+            college=self.college,
+            number=1,
+            name="First Period",
+            start_time=time(9, 0),
+            end_time=time(10, 0),
+        )
+
+        self.period_two = Period.objects.create(
+            college=self.college,
+            number=2,
+            name="Second Period",
+            start_time=time(10, 0),
+            end_time=time(11, 0),
+        )
+
+        Enrollment.objects.create(
+            student=self.student_profile,
+            academic_year=self.academic_year,
+            class_section=self.section_a,
+            is_active=True,
+        )
+
+        self.timetable_a = Timetable.objects.create(
+            college=self.college,
+            academic_year=self.academic_year,
+            class_section=self.section_a,
+            period=self.period_one,
+            course=self.course,
+            faculty=self.faculty_a,
+            weekday="MON",
+            classroom="Room 101",
+            is_active=True,
+        )
+
+        self.timetable_b = Timetable.objects.create(
+            college=self.college,
+            academic_year=self.academic_year,
+            class_section=self.section_b,
+            period=self.period_two,
+            course=self.course,
+            faculty=self.faculty_b,
+            weekday="MON",
+            classroom="Room 102",
+            is_active=True,
+        )
+
+        self.inactive_entry = Timetable.objects.create(
+            college=self.college,
+            academic_year=self.academic_year,
+            class_section=self.section_a,
+            period=self.period_two,
+            course=self.course,
+            faculty=self.faculty_a,
+            weekday="TUE",
+            classroom="Room 101",
+            is_active=False,
+        )
+
+    def test_faculty_sees_only_own_timetable(self):
+        self.client.force_login(self.faculty_a)
+
+        response = self.client.get(reverse("faculty_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+
+        entries = list(response.context["timetable_entries"])
+
+        self.assertIn(self.timetable_a, entries)
+        self.assertNotIn(self.timetable_b, entries)
+
+    def test_faculty_does_not_see_inactive_timetable(self):
+        self.client.force_login(self.faculty_a)
+
+        response = self.client.get(reverse("faculty_dashboard"))
+
+        entries = list(response.context["timetable_entries"])
+
+        self.assertNotIn(self.inactive_entry, entries)
+
+    def test_student_sees_only_enrolled_class_timetable(self):
+        self.client.force_login(self.student)
+
+        response = self.client.get(reverse("student_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+
+        entries = list(response.context["timetable_entries"])
+
+        self.assertIn(self.timetable_a, entries)
+        self.assertNotIn(self.timetable_b, entries)
+
+    def test_student_does_not_see_inactive_timetable(self):
+        self.client.force_login(self.student)
+
+        response = self.client.get(reverse("student_dashboard"))
+
+        entries = list(response.context["timetable_entries"])
+
+        self.assertNotIn(self.inactive_entry, entries)

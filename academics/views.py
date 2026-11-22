@@ -8,9 +8,15 @@ from django.shortcuts import get_object_or_404, redirect, render
 from accounts.models import User
 from accounts.permissions import role_required
 
-from .forms import EnrollmentForm
-from .models import Enrollment, FacultyAssignment, Attendance, ClassSession
-
+from .forms import EnrollmentForm, TimetableForm
+from .models import (
+    Enrollment,
+    FacultyAssignment,
+    Attendance,
+    ClassSession,
+    Timetable,
+    AcademicYear,
+)
 
 
 @login_required
@@ -147,11 +153,11 @@ def mark_attendance(request, session_id):
 
                     student = enrollment.student
 
-                    status = request.POST.get(f"status_{student.id}", "")
+                    status = request.POST.get(
+                        f"status_{student.id}", ""
+                    )
 
-                    # Skip students whose attendance has not been marked.
                     if status == "":
-                        # Remove an existing record if the faculty selects Not Marked.
                         Attendance.objects.filter(
                             student=student,
                             class_session=session,
@@ -162,7 +168,8 @@ def mark_attendance(request, session_id):
 
                     if status not in valid_statuses:
                         raise ValidationError(
-                            f"Invalid attendance status for {student.registration_number}."
+                            f"Invalid attendance status for "
+                            f"{student.registration_number}."
                         )
 
                     attendance, created = Attendance.objects.get_or_create(
@@ -176,6 +183,7 @@ def mark_attendance(request, session_id):
 
                     attendance.full_clean()
                     attendance.save()
+
             return redirect(
                 "faculty_sessions",
                 assignment_id=session.faculty_assignment_id,
@@ -216,6 +224,7 @@ def mark_attendance(request, session_id):
 @login_required
 @role_required(User.Role.FACULTY)
 def faculty_sessions(request, assignment_id):
+
     assignment = get_object_or_404(
         FacultyAssignment.objects.select_related(
             "course",
@@ -261,3 +270,84 @@ def faculty_sessions(request, assignment_id):
         },
     )
 
+
+# --------------------------------------------------
+# TIMETABLE MANAGEMENT
+# --------------------------------------------------
+
+@login_required
+@role_required(User.Role.SUPER_ADMIN, User.Role.COLLEGE_ADMIN)
+def timetable_list(request):
+
+    if request.user.role == User.Role.SUPER_ADMIN:
+        timetables = Timetable.objects.all()
+    else:
+        timetables = Timetable.objects.filter(
+            college=request.user.college
+        )
+
+    timetables = timetables.select_related(
+        "college",
+        "academic_year",
+        "class_section",
+        "class_section__department",
+        "period",
+        "course",
+        "faculty",
+    ).order_by(
+        "college",
+        "weekday",
+        "period__number",
+    )
+
+    return render(
+        request,
+        "academics/timetable_list.html",
+        {"timetables": timetables},
+    )
+
+
+@login_required
+@role_required(User.Role.SUPER_ADMIN, User.Role.COLLEGE_ADMIN)
+def timetable_create(request):
+
+    if request.user.role == User.Role.SUPER_ADMIN:
+        messages.info(
+            request,
+            "Timetable creation by Super Admin will be configured "
+            "in a later step. Please use a College Admin account."
+        )
+        return redirect("timetable_list")
+
+    if request.method == "POST":
+        form = TimetableForm(
+            request.POST,
+            user=request.user,
+        )
+
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    timetable = form.save(commit=False)
+                    timetable.college = request.user.college
+                    timetable.full_clean()
+                    timetable.save()
+
+                messages.success(
+                    request,
+                    "Timetable entry created successfully.",
+                )
+
+                return redirect("timetable_list")
+
+            except ValidationError as error:
+                form.add_error(None, error)
+
+    else:
+        form = TimetableForm(user=request.user)
+
+    return render(
+        request,
+        "academics/timetable_form.html",
+        {"form": form},
+    )

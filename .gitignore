@@ -11,3 +11,4 @@ media/
 .coverage
 .idea/
 .vscode/
+backup_before_timetable.json

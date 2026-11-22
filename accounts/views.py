@@ -14,8 +14,7 @@ from .forms import (
 from .models import StudentProfile, FacultyProfile
 from .permissions import role_required
 
-from academics.models import FacultyAssignment
-
+from academics.models import FacultyAssignment, Timetable, Enrollment
 
 User = get_user_model()
 
@@ -68,6 +67,7 @@ def college_admin_dashboard(request):
 @login_required
 @role_required(User.Role.FACULTY)
 def faculty_dashboard(request):
+
     assignments = (
         FacultyAssignment.objects
         .filter(
@@ -83,11 +83,29 @@ def faculty_dashboard(request):
         .order_by("course__code")
     )
 
+    timetable_entries = (
+        Timetable.objects
+        .filter(
+            faculty=request.user,
+            college=request.user.college,
+            is_active=True,
+        )
+        .select_related(
+            "academic_year",
+            "class_section",
+            "class_section__department",
+            "course",
+            "period",
+        )
+        .order_by("weekday", "period__number")
+    )
+
     return render(
         request,
         "accounts/faculty_dashboard.html",
         {
             "assignments": assignments,
+            "timetable_entries": timetable_entries,
         },
     )
 
@@ -95,9 +113,41 @@ def faculty_dashboard(request):
 @login_required
 @role_required(User.Role.STUDENT)
 def student_dashboard(request):
+    enrollments = Enrollment.objects.filter(
+        student__user=request.user,
+        is_active=True,
+    )
+
+    timetable_entries = Timetable.objects.none()
+
+    for enrollment in enrollments:
+        timetable_entries = timetable_entries | Timetable.objects.filter(
+            college=request.user.college,
+            academic_year=enrollment.academic_year,
+            class_section=enrollment.class_section,
+            is_active=True,
+        )
+
+    timetable_entries = (
+        timetable_entries
+        .select_related(
+            "period",
+            "course",
+            "faculty",
+            "class_section",
+            "class_section__department",
+            "academic_year",
+        )
+        .order_by("weekday", "period__number")
+        .distinct()
+    )
+
     return render(
         request,
         "accounts/student_dashboard.html",
+        {
+            "timetable_entries": timetable_entries,
+        },
     )
 
 

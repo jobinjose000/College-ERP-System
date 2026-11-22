@@ -459,3 +459,201 @@ class ClassSession(models.Model):
             f"Period {self.period_number} - "
             f"{self.date}"
         )
+
+
+class Period(models.Model):
+    college = models.ForeignKey(
+        "core.College",
+        on_delete=models.CASCADE,
+        related_name="periods",
+    )
+    number = models.PositiveSmallIntegerField()
+    name = models.CharField(max_length=50, blank=True)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["college", "number"],
+                name="unique_period_number_per_college",
+            ),
+        ]
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if self.end_time <= self.start_time:
+            raise ValidationError(
+                "Period end time must be after start time."
+            )
+
+    def __str__(self):
+        return f"Period {self.number} - {self.college.name}"
+
+
+class Timetable(models.Model):
+
+    class Weekday(models.TextChoices):
+        MONDAY = "MON", "Monday"
+        TUESDAY = "TUE", "Tuesday"
+        WEDNESDAY = "WED", "Wednesday"
+        THURSDAY = "THU", "Thursday"
+        FRIDAY = "FRI", "Friday"
+        SATURDAY = "SAT", "Saturday"
+
+    college = models.ForeignKey(
+        "core.College",
+        on_delete=models.CASCADE,
+        related_name="timetable_entries",
+    )
+    academic_year = models.ForeignKey(
+        "academics.AcademicYear",
+        on_delete=models.PROTECT,
+        related_name="timetable_entries",
+    )
+    class_section = models.ForeignKey(
+        "academics.ClassSection",
+        on_delete=models.CASCADE,
+        related_name="timetable_entries",
+    )
+    period = models.ForeignKey(
+        "academics.Period",
+        on_delete=models.PROTECT,
+        related_name="timetable_entries",
+    )
+    course = models.ForeignKey(
+        "academics.Course",
+        on_delete=models.PROTECT,
+        related_name="timetable_entries",
+    )
+    faculty = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.PROTECT,
+        limit_choices_to={"role": "FACULTY"},
+        related_name="timetable_entries",
+    )
+    weekday = models.CharField(
+        max_length=3,
+        choices=Weekday.choices,
+    )
+    classroom = models.CharField(max_length=50, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if not all([
+            self.college_id,
+            self.academic_year_id,
+            self.class_section_id,
+            self.period_id,
+            self.course_id,
+            self.faculty_id,
+            self.weekday,
+        ]):
+            return
+
+        section = self.class_section
+
+        if section.college_id != self.college_id:
+            raise ValidationError(
+                "Class section must belong to the selected college."
+            )
+
+        if self.academic_year.college_id != self.college_id:
+            raise ValidationError(
+                "Academic year must belong to the selected college."
+            )
+
+        if section.academic_year_id != self.academic_year_id:
+            raise ValidationError(
+                "Academic year must match the class section."
+            )
+
+        if self.period.college_id != self.college_id:
+            raise ValidationError(
+                "Period must belong to the selected college."
+            )
+
+        if self.course.college_id != self.college_id:
+            raise ValidationError(
+                "Course must belong to the selected college."
+            )
+
+        if self.course.department_id != section.department_id:
+            raise ValidationError(
+                "Course and class section must belong to the same department."
+            )
+
+        if self.faculty.college_id != self.college_id:
+            raise ValidationError(
+                "Faculty must belong to the selected college."
+            )
+
+        if self.faculty.role != "FACULTY":
+            raise ValidationError(
+                "Only faculty members can be assigned."
+            )
+
+        assigned = FacultyAssignment.objects.filter(
+            college=self.college,
+            faculty=self.faculty,
+            course=self.course,
+            class_section=section,
+        ).exists()
+
+        if not assigned:
+            raise ValidationError(
+                "This faculty member is not assigned to the selected course and class."
+            )
+
+        # Check faculty timetable conflicts
+        faculty_conflict = Timetable.objects.filter(
+            college=self.college,
+            faculty=self.faculty,
+            weekday=self.weekday,
+            period=self.period,
+            is_active=True,
+        ).exclude(pk=self.pk).exists()
+
+        if faculty_conflict:
+            raise ValidationError(
+                "This faculty member already has a class during this period."
+            )
+
+        # Check classroom timetable conflicts
+        if self.classroom.strip():
+            classroom_conflict = Timetable.objects.filter(
+                college=self.college,
+                classroom__iexact=self.classroom.strip(),
+                weekday=self.weekday,
+                period=self.period,
+                is_active=True,
+            ).exclude(pk=self.pk).exists()
+
+            if classroom_conflict:
+                raise ValidationError(
+                    "This classroom is already occupied during this period."
+                )
+
+    class Meta:
+        ordering = ["weekday", "period__number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["class_section", "weekday", "period"],
+                name="unique_class_period_per_weekday",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.class_section} - "
+            f"{self.get_weekday_display()} - "
+            f"{self.period}"
+        )
+
+
+    
