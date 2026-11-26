@@ -1,0 +1,122 @@
+
+{% extends "accounts/base.html" %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+
+    <div class="mb-4">
+        <h2 class="fw-bold mb-1">{{ title }}</h2>
+        <p class="text-muted mb-0">
+            Enter the course information below.
+        </p>
+    </div>
+
+    <div class="card border-0 shadow-sm" style="max-width: 850px;">
+
+        <div class="card-body p-4">
+
+            <form method="POST">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <div class="row g-3">
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">
+                            Department
+                        </label>
+                        {{ form.department }}
+                        {% for error in form.department.errors %}
+                            <div class="text-danger small">
+                                {{ error }}
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">
+                            Course Code
+                        </label>
+                        {{ form.code }}
+                        {% for error in form.code.errors %}
+                            <div class="text-danger small">
+                                {{ error }}
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">
+                            Course Name
+                        </label>
+                        {{ form.name }}
+                        {% for error in form.name.errors %}
+                            <div class="text-danger small">
+                                {{ error }}
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">
+                            Credits
+                        </label>
+                        {{ form.credits }}
+                        {% for error in form.credits.errors %}
+                            <div class="text-danger small">
+                                {{ error }}
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">
+                            Semester
+                        </label>
+                        {{ form.semester }}
+                        {% for error in form.semester.errors %}
+                            <div class="text-danger small">
+                                {{ error }}
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-check">
+                            {{ form.is_active }}
+                            <label class="form-check-label fw-semibold">
+                                Active Course
+                            </label>
+                        </div>
+                    </div>
+
+                </div>
+
+                <hr class="my-4">
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle me-1"></i>
+                        Save Course
+                    </button>
+
+                    <a href="{% url 'course_list' %}"
+                       class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

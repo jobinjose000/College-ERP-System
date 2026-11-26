@@ -13,6 +13,7 @@ from .forms import (
     TimetableForm,
     AcademicYearForm,
     DepartmentForm,
+    CourseForm,
 )
 from .models import (
     Enrollment,
@@ -22,8 +23,8 @@ from .models import (
     Timetable,
     AcademicYear,
     Department,
+    Course,
 )
-
 
 @login_required
 @role_required(User.Role.SUPER_ADMIN, User.Role.COLLEGE_ADMIN)
@@ -599,5 +600,122 @@ def department_edit(request, department_id):
         {
             "form": form,
             "title": "Edit Department",
+        },
+    )
+
+
+# --------------------------------------------------
+# COURSE MANAGEMENT
+# --------------------------------------------------
+
+@login_required
+@role_required(User.Role.COLLEGE_ADMIN)
+def course_list(request):
+
+    courses = (
+        Course.objects.filter(
+            college=request.user.college
+        )
+        .select_related("department")
+        .order_by("code")
+    )
+
+    return render(
+        request,
+        "academics/course_list.html",
+        {
+            "courses": courses,
+        },
+    )
+
+
+@login_required
+@role_required(User.Role.COLLEGE_ADMIN)
+def course_create(request):
+
+    if request.method == "POST":
+        form = CourseForm(
+            request.POST,
+            user=request.user,
+        )
+
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    course = form.save(commit=False)
+                    course.college = request.user.college
+                    course.full_clean()
+                    course.save()
+
+                messages.success(
+                    request,
+                    "Course created successfully.",
+                )
+
+                return redirect("course_list")
+
+            except ValidationError as error:
+                form.add_error(None, error)
+
+    else:
+        form = CourseForm(user=request.user)
+
+    return render(
+        request,
+        "academics/course_form.html",
+        {
+            "form": form,
+            "title": "Create Course",
+        },
+    )
+
+
+@login_required
+@role_required(User.Role.COLLEGE_ADMIN)
+def course_edit(request, course_id):
+
+    course = get_object_or_404(
+        Course,
+        id=course_id,
+        college=request.user.college,
+    )
+
+    if request.method == "POST":
+        form = CourseForm(
+            request.POST,
+            instance=course,
+            user=request.user,
+        )
+
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    updated_course = form.save(commit=False)
+                    updated_course.college = request.user.college
+                    updated_course.full_clean()
+                    updated_course.save()
+
+                messages.success(
+                    request,
+                    "Course updated successfully.",
+                )
+
+                return redirect("course_list")
+
+            except ValidationError as error:
+                form.add_error(None, error)
+
+    else:
+        form = CourseForm(
+            instance=course,
+            user=request.user,
+        )
+
+    return render(
+        request,
+        "academics/course_form.html",
+        {
+            "form": form,
+            "title": "Edit Course",
         },
     )

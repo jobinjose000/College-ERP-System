@@ -81,4 +81,22 @@ urlpatterns = [
         views.department_edit,
         name="department_edit",
     ),
+
+    # Course Management
+    path(
+        "courses/",
+        views.course_list,
+        name="course_list",
+    ),
+    path(
+        "courses/add/",
+        views.course_create,
+        name="course_create",
+    ),
+    path(
+        "courses/<int:course_id>/edit/",
+        views.course_edit,
+        name="course_edit",
+    ),
+
 ]

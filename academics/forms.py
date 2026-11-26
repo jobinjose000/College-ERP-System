@@ -60,6 +60,90 @@ class DepartmentForm(forms.ModelForm):
         return department
 
 
+# ==========================================
+# COURSE MANAGEMENT FORM
+# ==========================================
+
+class CourseForm(forms.ModelForm):
+
+    class Meta:
+        model = Course
+        fields = [
+            "code",
+            "name",
+            "department",
+            "credits",
+            "semester",
+            "is_active",
+        ]
+
+        widgets = {
+            "code": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Example: CS301",
+                }
+            ),
+            "name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Example: Database Management Systems",
+                }
+            ),
+            "department": forms.Select(
+                attrs={
+                    "class": "form-select",
+                }
+            ),
+            "credits": forms.NumberInput(
+                attrs={
+                    "class": "form-control",
+                    "min": 1,
+                    "max": 20,
+                }
+            ),
+            "semester": forms.NumberInput(
+                attrs={
+                    "class": "form-control",
+                    "min": 1,
+                    "max": 12,
+                }
+            ),
+            "is_active": forms.CheckboxInput(
+                attrs={
+                    "class": "form-check-input",
+                }
+            ),
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if user is None or user.college is None:
+            raise ValueError(
+                "A College Admin account is required."
+            )
+
+        self.user = user
+
+        # College Admin can select only their own departments.
+        self.fields["department"].queryset = (
+            Department.objects.filter(
+                college=user.college
+            ).order_by("name")
+        )
+
+    def save(self, commit=True):
+        course = super().save(commit=False)
+        course.college = self.user.college
+
+        if commit:
+            course.full_clean()
+            course.save()
+
+        return course
+
+
 class EnrollmentForm(forms.ModelForm):
 
     class Meta:
@@ -252,3 +336,76 @@ class AcademicYearForm(forms.ModelForm):
             academic_year.save()
 
         return academic_year
+
+
+class CourseForm(forms.ModelForm):
+
+    class Meta:
+        model = Course
+        fields = [
+            "department",
+            "code",
+            "name",
+            "credits",
+            "semester",
+            "is_active",
+        ]
+
+        widgets = {
+            "department": forms.Select(
+                attrs={"class": "form-select"}
+            ),
+            "code": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Example: CS301",
+                }
+            ),
+            "name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Example: Database Management Systems",
+                }
+            ),
+            "credits": forms.NumberInput(
+                attrs={
+                    "class": "form-control",
+                    "min": 1,
+                }
+            ),
+            "semester": forms.NumberInput(
+                attrs={
+                    "class": "form-control",
+                    "min": 1,
+                }
+            ),
+            "is_active": forms.CheckboxInput(
+                attrs={"class": "form-check-input"}
+            ),
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if user is None or user.college is None:
+            raise ValueError(
+                "A College Admin account is required."
+            )
+
+        self.user = user
+
+        self.fields["department"].queryset = (
+            Department.objects.filter(
+                college=user.college
+            ).order_by("name")
+        )
+
+    def save(self, commit=True):
+        course = super().save(commit=False)
+        course.college = self.user.college
+
+        if commit:
+            course.full_clean()
+            course.save()
+
+        return course
